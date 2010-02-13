@@ -1,6 +1,3 @@
-** FIRST OF ALL **
-This is a WIP!
-
 Shumai
 ======
 
