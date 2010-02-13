@@ -5,7 +5,7 @@ Shumai is _the_ Extended Kalman Filter (EKF) for fixed-wing aircraft. It provide
 
 In this first release only roll and pitch are included but yaw, position and wind estimation will follow shortly.
 
-Shumai was developed by [Tim Trueman](http://github.com/timtrueman) and Ryan Beall. It's based on a [BYU paper](http://contentdm.lib.byu.edu/ETD/image/etd1527.pdf) [PDF].
+Shumai was developed by [Tim Trueman](http://github.com/timtrueman) and [Ryan Beall](http://diydrones.com/profile/RyanBeall). It's based on a [BYU paper](http://contentdm.lib.byu.edu/ETD/image/etd1527.pdf) [PDF].
 
 Quickstart
 ==========
@@ -37,5 +37,5 @@ FAQ
 Q: Something doesn't work.<br/>
 A: Email or IM me: tim@dronedynamics.com
    
-Q: Where's the documenation?<br/>
+Q: Where's the documentation?<br/>
 A: It's coming. I promise.
