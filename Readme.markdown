@@ -29,11 +29,11 @@ I'll put up better screenshots later…
 
 X-Plane + Shumai running
 ---------
-![Running](http://dronedynamics.com/s/pretty_matrix_outputs-20100209-014613.jpg)
+![Running](http://dronedynamics.com/shumai-running.jpg)
 
 Performance
 --------
-![Performance](http://dronedynamics.com/s/EKF_data-20100213-004222.jpg)
+![Performance](http://dronedynamics.com/shumai-performance.jpg)
 
 FAQ
 ===
