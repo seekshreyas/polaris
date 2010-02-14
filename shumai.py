@@ -339,16 +339,17 @@ class XplaneListener(DatagramProtocol):
         When we receive a UDP packet from X-Plane we'll need to unpack the data.
         I should probably document this more. Bug me until I do so...
         """
-        self.Vair = unpack_from('<f', data, 9)[0]
-        self.az = 0 - unpack_from('<f', data, 9+16+36)[0]
-        self.ax = unpack_from('<f', data, 9+20+36)[0]
-        self.ay = unpack_from('<f', data, 9+24+36)[0]
-        self.q = math.radians(unpack_from('<f', data, 9+108+0)[0])
-        self.p = math.radians(unpack_from('<f', data, 9+108+4)[0])
-        self.r = math.radians(unpack_from('<f', data, 9+108+8)[0])
-        self.pitch = math.radians(unpack_from('<f', data, 9+144+0)[0])
-        self.roll = math.radians(unpack_from('<f', data, 9+144+4)[0])
-        self.heading = math.radians(unpack_from('<f', data, 9+144+8)[0])
+        fmt = '<f'
+        self.Vair = unpack_from(fmt, data, 9)[0]
+        self.az = 0 - unpack_from(fmt, data, 9+16+36)[0]
+        self.ax = unpack_from(fmt, data, 9+20+36)[0]
+        self.ay = unpack_from(fmt, data, 9+24+36)[0]
+        self.q = math.radians(unpack_from(fmt, data, 9+108+0)[0])
+        self.p = math.radians(unpack_from(fmt, data, 9+108+4)[0])
+        self.r = math.radians(unpack_from(fmt, data, 9+108+8)[0])
+        self.pitch = math.radians(unpack_from(fmt, data, 9+144+0)[0])
+        self.roll = math.radians(unpack_from(fmt, data, 9+144+4)[0])
+        self.heading = math.radians(unpack_from(fmt, data, 9+144+8)[0])
         logger.debug("Vair %0.1f, accelerometers (%0.2f, %0.2f, %0.2f), gyros (%0.2f, %0.2f, %0.2f)" % (self.Vair, self.ax, self.ay, self.az, self.p, self.q, self.r))
         current_state = self.ekf.loop()
         if self.screen is not None:
