@@ -9,24 +9,24 @@ What you should understand very clearly about this filter is it has gimbal lock 
 
 Shumai was developed by [Tim Trueman](http://github.com/timtrueman) and [Ryan Beall](http://diydrones.com/profile/RyanBeall). It's based on a [BYU paper](http://contentdm.lib.byu.edu/ETD/image/etd1527.pdf) [PDF].
 
-Installation
+Mac/Linux/Unix Installation
 ==========
-
-Mac/Linux/Unix
 1. Install X-Plane (this takes the longest)
 2. Download source code
-3. sudo easy_install numpy
+3. Execute "sudo easy_install numpy" in the terminal
 4. Start X-Plane and set the checkbox that outputs data
-5. run "python shumai.py" in the command line
+5. Run "python shumai.py" in the command line
 
-Windows
+Windows Installation
+==========
 1. Install X-Plane (this takes the longest)
 2. Download source code
 3. Install the 32-bit Python 2.6 package
 4. Install the 32-bit numpy package
-5. Set the registry thingy so python works in the command line
-6. Start X-Plane and set the checkbox that outputs data
-7. run "python shumai.py" in the command line
+5. Install the 32-bit twisted package
+6. Set the registry thingy so python works in the command line
+7. Start X-Plane and set the checkbox that outputs data
+8. Run "python shumai.py" in the command line
 
 Future
 =============
