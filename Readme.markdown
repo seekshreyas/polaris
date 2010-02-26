@@ -1,7 +1,9 @@
 Shumai
 ======
 
-Shumai is _the_ Extended Kalman Filter (EKF) for fixed-wing aircraft. It provides realtime orientation data to allow for higher-level navigation software to be developed.
+Shumai (pronounced "Shoe-my") is _the_ Extended Kalman Filter (EKF) for fixed-wing aircraft. It provides realtime orientation data to allow for higher-level navigation software to be developed.
+
+Shumai is a six-degree-of-freedom extended Kalman filter for inertial navigation, and *requires* a 3-axis gyro, 3-axis accelerometer, a 3-axis magnetometer, an airspeed sensor, an altimeter and GPS.
 
 In this first release only roll and pitch are included but yaw, position and wind estimation will follow shortly.
 
