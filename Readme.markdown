@@ -32,13 +32,13 @@ Windows Installation
 
 Future
 =============
-Yaw estimate
-Position estimate
-Wind vector estimate
-Altitude estimate
-Airspeed estimate
-Tuning / noise / real hardware testing (perhaps a genetic algorithm for tuning)
-Porting to other languages/platforms (microcontrollers)
+1. Yaw estimate
+2. Position estimate
+3. Wind vector estimate
+4. Altitude estimate
+5. Airspeed estimate
+6. Tuning / noise / real hardware testing (perhaps a genetic algorithm for tuning)
+7. Porting to other languages/platforms (microcontrollers)
 
 FAQ
 ===
