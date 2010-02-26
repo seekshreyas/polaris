@@ -21,10 +21,10 @@ Windows Installation
 ==========
 1. Install X-Plane (this takes the longest)
 2. Download source code
-3. Install the 32-bit Python 2.6 package
-4. Install the 32-bit numpy package
-5. Install the 32-bit twisted package
-6. Set the registry thingy so python works in the command line
+3. Install the 32-bit Python 2.6.x package here http://python.org/download/ (It should be the first package in the list)
+4. Install the 32-bit numpy package http://sourceforge.net/projects/numpy/files/ (Make sure it's for Python 2.6)
+5. Install the 32-bit twisted package http://twistedmatrix.com/ (Make sure it's for Python 2.6)
+6. Right-click on My Computer and go to Properties. This pops up a dialogue box of system information; click on the Advanced tab and then on the Environment Variables button. In the new dialogue that pops up, click on the Path variable in the System Variables box; then click the Edit button. Place your cursor in the Variable Value textbox, right before the final double-quote of the string. Type a semicolon (to separate the previous value from the one you're about to add) and then type the location of the python executable on your system—probably something like "C:\Python26". Click OK until you're out of all the dialogue boxes. Now, when you type python at any DOS command prompt, Windows will be able to automatically find and run the correct executable.
 7. Start X-Plane and set the checkbox that outputs data
 8. Run "python shumai.py" in the command line
 
@@ -38,21 +38,14 @@ Airspeed estimate
 Tuning / noise / real hardware testing (perhaps a genetic algorithm for tuning)
 Porting to other languages/platforms (microcontrollers)
 
-Screenshots
-===========
-X-Plane + Shumai running
----------
-![Running](http://dronedynamics.com/shumai-running.jpg)
-
-Performance
---------
-![Performance](http://dronedynamics.com/shumai-performance.jpg)
-
 FAQ
 ===
 
+Q: Why can't I use the 64-bit version on Windows?<br/>
+A: I can't get numpy or twisted to work for the 64-bit version (I can't remember which wasn't working—perhaps both)
+
 Q: Why did you build this and release it as open source?<br/>
-A: It's coming. I promise.
+A: I felt like it was a good idea; I wanted to learn about EKFs; There wasn't anything great out there; And I wanted to put out the best EKF available under an open source license.
 
 Q: What license is it released under?<br/>
 A: The MIT license: http://en.wikipedia.org/wiki/MIT_License
@@ -65,3 +58,19 @@ A: It's coming. I promise.
 
 Q: Why does your filter suffer from gimbal lock / singularities? I want to do aerobatics!<br/>
 A: The vast majority of UAVs are not going to be doing crazy maneuvers; a few common sense rules keeps things simple and allows for optimized precision. Also if you think you can solve this problem, email me or just write the code! This is open source after all.
+
+Q: Can I get involved and become rich and famous?<br/>
+A: Fuck yeah! And probably not. Email me anyways though if you want to get involved: tim@dronedynamics.com
+
+Q: Can you port this to my hardware/platform/microcontroller?<br/>
+A: Who knows? You can always do it yourself—I'll support you any way I can if you're doing it yourself.
+
+Screenshots
+===========
+X-Plane + Shumai running
+---------
+![Running](http://dronedynamics.com/shumai-running.jpg)
+
+Performance
+--------
+![Performance](http://dronedynamics.com/shumai-performance.jpg)
