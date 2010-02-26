@@ -13,7 +13,7 @@ Mac/Linux/Unix Installation
 ==========
 1. Install X-Plane (this takes the longest)
 2. Download source code
-3. Execute "sudo easy_install numpy" in the terminal
+3. Execute "sudo easy_install numpy twisted" in the terminal
 4. Start X-Plane and set the checkbox that outputs data
 5. Run "python shumai.py" in the command line
 
