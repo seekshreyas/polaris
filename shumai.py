@@ -1,9 +1,35 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
+"""
+Copyright (c) 2010 Tim Trueman and Ryan Beall
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+"""
+
+
 import socket
 import sys
-import math
+from math import cos, sin, tan, isnan, pi, degrees, radians
 from struct import unpack_from
 from datetime import datetime
 import logging
@@ -69,13 +95,13 @@ def get_matrix_display_size(m, precision=2, title=True):
 
 def safe_tangent(x):
     """ This is my awful attempt at preventing NaN from returning. """
-    tangent = math.tan(x)
-    if math.isnan(tangent):
+    tangent = tan(x)
+    if isnan(tangent):
         logger.error("Tangent departed, input x = %f" % x)
-        if tangent % (math.pi / 2) > 0:
-            tangent = math.tan(x+0.000000001)
+        if tangent % (pi / 2) > 0:
+            tangent = tan(x+0.000000001)
         else:
-            tangent = math.tan(x-0.000000001)
+            tangent = tan(x-0.000000001)
     return tangent
 
 class AttitudeObserver:
@@ -127,15 +153,15 @@ class AttitudeObserver:
 
     def __update_state_estimate_using_kinematic_update(self, p, q, r, dt):
         """ When we get new gyro readings we can update the estimate of pitch and roll with the new values. [ISEFMAV 2.20] """
-        self.phihat = self.phi + ((p + (q * math.sin(self.phi) * safe_tangent(self.theta)) + (r * math.cos(self.phi) * safe_tangent(self.theta))) * dt)
-        self.thetahat = self.theta + (((q * math.cos(self.phi)) - (r * math.sin(self.phi))) * dt)
+        self.phihat = self.phi + ((p + (q * sin(self.phi) * safe_tangent(self.theta)) + (r * cos(self.phi) * safe_tangent(self.theta))) * dt)
+        self.thetahat = self.theta + (((q * cos(self.phi)) - (r * sin(self.phi))) * dt)
         logger.debug("kinematic update, phihat = %f, thetahat = %f" % (self.phihat, self.thetahat))
 
     def __compute_linearized_state_update_matrix(self, q, r):
         """ Once we've updated the state estimates for phi and theta we need to linearize it again. [ISEFMAV 2.21] """
-        self.A[0,0] = (q * math.cos(self.phihat) * safe_tangent(self.thetahat)) - (r * math.sin(self.phihat) * safe_tangent(self.thetahat))
-        self.A[0,1] = ((q * math.sin(self.phihat)) - (r * math.cos(self.phihat))) / math.pow(math.cos(self.thetahat), 2)
-        self.A[1,0] = (-q * math.sin(self.phihat)) + (r * math.cos(self.phihat))
+        self.A[0,0] = (q * cos(self.phihat) * safe_tangent(self.thetahat)) - (r * sin(self.phihat) * safe_tangent(self.thetahat))
+        self.A[0,1] = ((q * sin(self.phihat)) - (r * cos(self.phihat))) / pow(cos(self.thetahat), 2)
+        self.A[1,0] = (-q * sin(self.phihat)) + (r * cos(self.phihat))
         # self.A[1,1] = 0
 
     def __propagate_covariance_matrix(self, dt):
@@ -146,15 +172,15 @@ class AttitudeObserver:
 
     def __linearized_model_output_matrix(self, p, q, r, Vair):
         """ Axhat, ayhat and azhat are used to compute the the expected accelerometer readings given the model (the flight dynamics of a fixed-wing aircraft). Once we have these we can look at the actual readings and adjust things accordingly. [ISEFMAV 2.26] """
-        self.axhat = ((Vair * q * math.sin(self.thetahat))/GRAVITY) + math.sin(self.thetahat)
-        self.ayhat = ((Vair * ((r * math.cos(self.thetahat)) - (p * math.sin(self.thetahat))))/GRAVITY) - (math.cos(self.thetahat) * math.sin(self.phihat))
-        self.azhat = ((-Vair * q * math.cos(self.thetahat))/GRAVITY) - (math.cos(self.thetahat) * math.cos(self.phihat))
+        self.axhat = ((Vair * q * sin(self.thetahat))/GRAVITY) + sin(self.thetahat)
+        self.ayhat = ((Vair * ((r * cos(self.thetahat)) - (p * sin(self.thetahat))))/GRAVITY) - (cos(self.thetahat) * sin(self.phihat))
+        self.azhat = ((-Vair * q * cos(self.thetahat))/GRAVITY) - (cos(self.thetahat) * cos(self.phihat))
 
     def __gain_calculation_and_variance_update(self, p, q, r, Vair):
         """ Calculate linearized output equations...this is the magic of the Kalman filter; here we are figuring out how much we trust the sensors [ISEFMAV 2.27] """
-        self.Cx = numpy.matrix([[0, ((q * Vair / GRAVITY) * math.cos(self.thetahat)) + math.cos(self.thetahat)]])
-        self.Cy = numpy.matrix([[-math.cos(self.thetahat) * math.cos(self.phihat), ((-r * Vair / GRAVITY) * math.sin(self.thetahat)) - ((p * Vair / GRAVITY) * math.cos(self.thetahat)) + (math.sin(self.thetahat) * math.sin(self.phihat))]])
-        self.Cz = numpy.matrix([[math.cos(self.thetahat) * math.cos(self.phihat), (((q * Vair / GRAVITY) * math.sin(self.thetahat)) + math.cos(self.phihat)) * math.sin(self.thetahat)]])
+        self.Cx = numpy.matrix([[0, ((q * Vair / GRAVITY) * cos(self.thetahat)) + cos(self.thetahat)]])
+        self.Cy = numpy.matrix([[-cos(self.thetahat) * cos(self.phihat), ((-r * Vair / GRAVITY) * sin(self.thetahat)) - ((p * Vair / GRAVITY) * cos(self.thetahat)) + (sin(self.thetahat) * sin(self.phihat))]])
+        self.Cz = numpy.matrix([[cos(self.thetahat) * cos(self.phihat), (((q * Vair / GRAVITY) * sin(self.thetahat)) + cos(self.phihat)) * sin(self.thetahat)]])
 
     def __get_sensor_noise_covariance_matrix(self, q):
         """ Sensor noise penalty, needs a better explanation of how it works. Tau is a tuning parameter which is increased to reduce the Kalman gain on x-axis accelerometer during high pitch rate maneuvers (that flight dynamic is unmodeled). I'm trying values between 10-100. [ISEFMAV 2.28] """
@@ -168,7 +194,7 @@ class AttitudeObserver:
         self.Lx = (self.Px * self.Cx.transpose()) / (self.rx + (self.Cx * self.Px * self.Cx.transpose()))
         self.Ly = (self.Py * self.Cy.transpose()) / (self.ry + (self.Cy * self.Py * self.Cy.transpose()))
         self.Lz = (self.Pz * self.Cz.transpose()) / (self.rz + (self.Cz * self.Pz * self.Cz.transpose()))
-        self.acceleration_magnitude = math.sqrt(self.ax**2 + self.ay**2 + self.az**2) / GRAVITY
+        self.acceleration_magnitude = sqrt(self.ax**2 + self.ay**2 + self.az**2) / GRAVITY
         self.acceleration_weight = min(max(0, (1 - 2 * abs(1 - self.acceleration_magnitude))), 1)
         self.Lx *= self.acceleration_weight
         self.Ly *= self.acceleration_weight
@@ -183,13 +209,13 @@ class AttitudeObserver:
 
     def __check_for_divergence(self):
         """ Divergence is when the EKF has departed from reality is is confused. I log it so you can see when the EKF goes into a broken state. You can try resetting it and it may come back (no guarantees but it's been known to work). """
-        if abs(math.degrees(self.phi)) > 90:
+        if abs(degrees(self.phi)) > 90:
             if self.roll_is_departed == False:
                 self.roll_is_departed = True
                 logger.critical("Roll has departed.")
         else:
             self.roll_is_departed = False
-        if abs(math.degrees(self.theta)) > 90:
+        if abs(degrees(self.theta)) > 90:
             if self.pitch_is_departed == False:
                 self.pitch_is_departed = True
                 logger.critical("Pitch has departed.")
@@ -222,8 +248,8 @@ class AttitudeObserver:
                    "axhat":self.axhat,
                    "ayhat":self.ayhat,
                    "azhat":self.azhat,
-                   "Phi (deg)":math.degrees(self.phi),
-                   "Theta (deg)":math.degrees(self.theta),}
+                   "Phi (deg)":degrees(self.phi),
+                   "Theta (deg)":degrees(self.theta),}
         scalar_count = len(scalars)
         screen.addstr(0, 0, "Shumai: the Extended Kalman Filter for aircraft")
         i = 1
@@ -279,7 +305,7 @@ class AttitudeObserver:
         if screen:
             self.display_state(screen)
         else:
-            logger.info("roll = %f, pitch = %f" % (math.degrees(self.phi), math.degrees(self.theta)))
+            logger.info("roll = %f, pitch = %f" % (degrees(self.phi), degrees(self.theta)))
         return self.phi, self.theta
 
 class Shumai:
@@ -311,10 +337,10 @@ class Shumai:
         Vair = self.differential_pressure_sensor.read_airspeed() * 0.5144444444 # kias to meters per second
         phi, theta = self.attitude_observer.estimate_roll_and_pitch(p, q, r, Vair, ax, ay, az, self.dt, screen=self.screen)
         return {
-            "roll": math.degrees(phi),
-            "pitch": math.degrees(theta),
+            "roll": degrees(phi),
+            "pitch": degrees(theta),
             # Coming soon:
-            # "yaw": math.degrees(psi),
+            # "yaw": degrees(psi),
             # "airspeed": Vair,
             # "position": (position_north, position_east),
             # "wind": (wind_north, wind_east),
@@ -344,12 +370,16 @@ class XplaneListener(DatagramProtocol):
         self.az = 0 - unpack_from(fmt, data, 9+16+36)[0]
         self.ax = unpack_from(fmt, data, 9+20+36)[0]
         self.ay = unpack_from(fmt, data, 9+24+36)[0]
-        self.q = math.radians(unpack_from(fmt, data, 9+108+0)[0])
-        self.p = math.radians(unpack_from(fmt, data, 9+108+4)[0])
-        self.r = math.radians(unpack_from(fmt, data, 9+108+8)[0])
-        self.pitch = math.radians(unpack_from(fmt, data, 9+144+0)[0])
-        self.roll = math.radians(unpack_from(fmt, data, 9+144+4)[0])
-        self.heading = math.radians(unpack_from(fmt, data, 9+144+8)[0])
+        self.q = radians(unpack_from(fmt, data, 9+108+0)[0])
+        self.p = radians(unpack_from(fmt, data, 9+108+4)[0])
+        self.r = radians(unpack_from(fmt, data, 9+108+8)[0])
+        self.pitch = radians(unpack_from(fmt, data, 9+144+0)[0])
+        self.roll = radians(unpack_from(fmt, data, 9+144+4)[0])
+        self.heading = radians(unpack_from(fmt, data, 9+144+8)[0])
+        phi, theta, psi = self.roll, self.pitch, self.heading
+        self.bx = cos(theta) * cos(psi) * cos(psi) * -sin(theta)
+        self.by = ((sin(phi) * sin(theta) * cos(psi)) - (cos(phi) * sin(psi))) * ((sin(phi) *sin(theta) * sin(psi)) + (cos(phi) * cos(psi))) * sin(phi) * cos(theta)
+        self.bz = ((cos(phi) * sin(theta) * cos(psi)) + (sin(phi) * sin(psi))) * ((cos(phi) * sin(theta) * sin(psi)) - (sin(phi) * cos(psi))) * cos(phi) * cos(theta)
         logger.debug("Vair %0.1f, accelerometers (%0.2f, %0.2f, %0.2f), gyros (%0.2f, %0.2f, %0.2f)" % (self.Vair, self.ax, self.ay, self.az, self.p, self.q, self.r))
         current_state = self.ekf.loop()
         if self.screen is not None:
@@ -359,7 +389,7 @@ class XplaneListener(DatagramProtocol):
         else:
             sys.stdout.write("%sRoll = %f, pitch = %f      " % (chr(13), current_state['roll'], current_state['pitch']))
             sys.stdout.flush()
-        FOUT.writerow([math.degrees(self.roll), math.degrees(self.pitch), current_state['roll'], current_state['pitch'], current_state['roll'] - math.degrees(self.roll), current_state['pitch'] - math.degrees(self.pitch)])
+        FOUT.writerow([degrees(self.roll), degrees(self.pitch), current_state['roll'], current_state['pitch'], current_state['roll'] - degrees(self.roll), current_state['pitch'] - degrees(self.pitch)])
 
     def read_gyros(self):
         return self.p, self.q, self.r
