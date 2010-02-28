@@ -3,7 +3,7 @@
 
 import socket
 import sys
-from math import cos, sin, tan, isnan, pi, degrees, radians, sqrt
+from math import cos, sin, tan, atan, isnan, pi, degrees, radians, sqrt
 from struct import unpack_from
 from datetime import datetime
 import logging
@@ -232,7 +232,7 @@ class AttitudeObserver:
 class Shumai:
     """
     Shumai [pronounced "Shoe-my"] is a six-degree-of-freedom extended Kalman filter for inertial navigation, and *requires* a 3-axis gyro, 3-axis accelerometer, a 3-axis magnetometer, an airspeed sensor, an altimeter and GPS. It is based on the work in this paper: http://contentdm.lib.byu.edu/ETD/image/etd1527.pdf
-"""
+    """
 
     def __init__(self, imu, differential_pressure_sensor, static_pressure_sensor, magnetometer, gps):
         self.phi, self.theta, self.psi = 0, 0, 0
@@ -274,6 +274,8 @@ class XplaneListener(DatagramProtocol):
         self.dt = 0.05
         self.last_time = datetime.now()
         self.ekf = Shumai(self, self, self, self, self) # hack for X-Plane
+        self.bxyz = numpy.mat("0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0")
+        self.mxyz = numpy.mat("25396.8; 2011.7; 38921.5") # in nanotesla units
 
     def datagramReceived(self, data, (host, port)):
         """
@@ -292,10 +294,22 @@ class XplaneListener(DatagramProtocol):
         self.roll = radians(unpack_from(fmt, data, 9+144+4)[0])
         self.heading = radians(unpack_from(fmt, data, 9+144+8)[0])
         phi, theta, psi = self.roll, self.pitch, self.heading
-        self.bx = cos(theta) * cos(psi) * cos(psi) * -sin(theta)
-        self.by = ((sin(phi) * sin(theta) * cos(psi)) - (cos(phi) * sin(psi))) * ((sin(phi) *sin(theta) * sin(psi)) + (cos(phi) * cos(psi))) * sin(phi) * cos(theta)
-        self.bz = ((cos(phi) * sin(theta) * cos(psi)) + (sin(phi) * sin(psi))) * ((cos(phi) * sin(theta) * sin(psi)) - (sin(phi) * cos(psi))) * cos(phi) * cos(theta)
-        display.register_scalars({"bx":self.bx,"by":self.by,"bz":self.bz})
+        self.bxyz[0,0] = cos(theta) * cos(psi)
+        self.bxyz[0,1] = cos(theta) * sin(psi)
+        self.bxyz[0,2] = -sin(theta)
+        self.bxyz[1,0] = (sin(phi) * sin(theta) * cos(psi)) - (cos(phi) * sin(psi))
+        self.bxyz[1,1] = (sin(phi) *sin(theta) * sin(psi)) + (cos(phi) * cos(psi))
+        self.bxyz[1,2] = sin(phi) * cos(theta)
+        self.bxyz[2,0] = (cos(phi) * sin(theta) * cos(psi)) + (sin(phi) * sin(psi))
+        self.bxyz[2,1] = (cos(phi) * sin(theta) * sin(psi)) - (sin(phi) * cos(psi))
+        self.bxyz[2,2] = cos(phi) * cos(theta)
+        b = self.bxyz * self.mxyz
+        display.register_matrices({"b":b,"bxyz":self.bxyz,"mxyz":self.mxyz})
+        self.bx = b[0,0]/10000 # conversion from nanotesla to gauss
+        self.by = b[1,0]/10000 # conversion from nanotesla to gauss
+        self.bz = b[2,0]/10000 # conversion from nanotesla to gauss
+        emulated_magnetometer = self.gauss_to_heading(self.bx, self.by, self.bz)
+        display.register_scalars({"bx":self.bx,"by":self.by,"bz":self.bz,"mag heading":emulated_magnetometer})
         logger.debug("Vair %0.1f, accelerometers (%0.2f, %0.2f, %0.2f), gyros (%0.2f, %0.2f, %0.2f)" % (self.Vair, self.ax, self.ay, self.az, self.p, self.q, self.r))
         current_state = self.ekf.loop()
         if display.curses_available is True:
@@ -304,6 +318,20 @@ class XplaneListener(DatagramProtocol):
             sys.stdout.write("%sRoll = %f, pitch = %f      " % (chr(13), current_state['roll'], current_state['pitch']))
             sys.stdout.flush()
         FOUT.writerow([degrees(self.roll), degrees(self.pitch), current_state['roll'], current_state['pitch'], current_state['roll'] - degrees(self.roll), current_state['pitch'] - degrees(self.pitch)])
+
+    def gauss_to_heading(self, x, y, z):
+        heading = 0
+        if x == 0 and y < 0:
+            heading = PI/2.0
+        if x == 0 and y > 0:
+            heading = 3.0 * pi / 2.0
+        if x < 0:
+            heading = pi - atan(y/x)
+        if x > 0 and y < 0:
+            heading = -atan(y/x)
+        if x > 0 and y > 0:
+            heading = 2.0 * pi - atan(y/x)
+        return degrees(heading)
 
     def read_gyros(self):
         return self.p, self.q, self.r
