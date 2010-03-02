@@ -12,7 +12,7 @@ Shumai was developed by [Tim Trueman](http://github.com/timtrueman) and [Ryan Be
 
 Mac/Linux/Unix Installation
 ==========
-1. Install X-Plane (this takes the longest)
+1. Go to http://x-plane.com/pg_downloads.html and download the demo (this takes the longest)
 2. Download source code
 3. Execute "sudo easy_install numpy twisted" in the terminal
 4. Start X-Plane and set the checkbox that outputs data
@@ -20,7 +20,7 @@ Mac/Linux/Unix Installation
 
 Windows Installation
 ==========
-1. Install X-Plane (this takes the longest)
+1. Go to http://x-plane.com/pg_downloads.html and download the demo (this takes the longest)
 2. Download source code
 3. Install the 32-bit Python 2.6.x package here http://python.org/download/ (It should be the first package in the list)
 4. Install the 32-bit numpy package http://sourceforge.net/projects/numpy/files/ (Make sure it's for Python 2.6)
