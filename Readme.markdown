@@ -26,7 +26,7 @@ Windows Installation
 4. Install the 32-bit numpy package http://sourceforge.net/projects/numpy/files/ (Make sure it's for Python 2.6)
 5. Install the 32-bit twisted package http://twistedmatrix.com/ (Make sure it's for Python 2.6)
 6. Right-click on My Computer and go to Properties. This pops up a dialogue box of system information; click on the Advanced tab and then on the Environment Variables button. In the new dialogue that pops up, click on the Path variable in the System Variables box; then click the Edit button. Place your cursor in the Variable Value textbox, right before the final double-quote of the string. Type a semicolon (to separate the previous value from the one you're about to add) and then type the location of the python executable on your system—probably something like "C:\Python26". Click OK until you're out of all the dialogue boxes. Now, when you type python at any DOS command prompt, Windows will be able to automatically find and run the correct executable.
-7. Start X-Plane and set the checkbox that outputs data
+7. Start X-Plane and set the checkbox that outputs data (Input/Output in the menus then see screenshot below)
 8. Run "python shumai.py" in the command line
 
 Future
