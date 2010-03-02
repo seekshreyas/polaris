@@ -15,7 +15,7 @@ Mac/Linux/Unix Installation
 1. Go to http://x-plane.com/pg_downloads.html and download the demo (this takes the longest)
 2. Download source code
 3. Execute "sudo easy_install numpy twisted" in the terminal
-4. Start X-Plane and set the checkbox that outputs data
+4. Start X-Plane and set the checkbox that outputs data (Input/Output in the menus then see screenshot below)
 5. Run "python shumai.py" in the command line
 
 Windows Installation
@@ -75,3 +75,7 @@ X-Plane + Shumai running
 Performance
 --------
 ![Performance](http://dronedynamics.com/shumai-performance.jpg)
+
+X-Plane Config
+--------
+![X-Plane Config](http://dronedynamics.com/xplane_config.png)
