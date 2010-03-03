@@ -4,12 +4,12 @@ class Display:
     """
 
     def __init__(self):
+        self.scalars = {}
+        self.matrices = {}
         try:
             import curses
             self.curses_available = True
             self.screen = curses.initscr()
-            self.scalars = {}
-            self.matrices = {}
         except:
             print "Curses library not installed defaulting to standard console output"
             self.curses_available = False
