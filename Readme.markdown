@@ -38,6 +38,9 @@ Future
 5. Airspeed estimate
 6. Tuning / noise / real hardware testing (perhaps a genetic algorithm for tuning)
 7. Porting to other languages/platforms (microcontrollers)
+8. Email Austin about virtual magnetometer in X-Plane
+9. Clean up heading http://twitter.com/dronedynamics/status/10015241043
+10. EKF for z-component
 
 FAQ
 ===

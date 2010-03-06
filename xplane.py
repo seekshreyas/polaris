@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# encoding: utf-8
-
 import sys
 import socket
 from twisted.internet.protocol import DatagramProtocol
