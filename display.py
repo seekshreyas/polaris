@@ -1,7 +1,17 @@
-class Display:
+
+
+class Display(object):
     """
     This is a library for doing a comprehensive, realtime display of all the states within the EKF.
     """
+    
+    # Hacks for singleton functionality (is there a better way to do this?)
+    _instance = None
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Display, cls).__new__(
+                                cls, *args, **kwargs)
+        return cls._instance
 
     def __init__(self):
         self.scalars = {}
@@ -16,7 +26,6 @@ class Display:
 
     def __del__(self):
         if self.curses_available:
-            import curses
             curses.endwin()
 
     def register_scalar(self, label, scalar):

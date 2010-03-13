@@ -31,7 +31,7 @@ Windows Installation
 
 Future
 =============
-1. Yaw estimate
+1. Yaw estimate (see [this](http://gist.github.com/322555))
 2. Position estimate
 3. Wind vector estimate
 4. Altitude estimate
@@ -39,8 +39,6 @@ Future
 6. Tuning / noise / real hardware testing (perhaps a genetic algorithm for tuning)
 7. Porting to other languages/platforms (microcontrollers)
 8. Email Austin about virtual magnetometer in X-Plane
-9. Clean up heading http://twitter.com/dronedynamics/status/10015241043
-10. EKF for z-component
 
 FAQ
 ===
