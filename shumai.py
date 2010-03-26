@@ -2,7 +2,7 @@ import sys
 import socket
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor
-from struct import unpack_from
+from struct import unpack_from, pack
 from math import cos, sin, tan, atan, atan2, isnan, pi, degrees, radians, sqrt
 from numpy import matrix
 from datetime import datetime
@@ -13,12 +13,16 @@ from display import Display
 from ekf import AttitudeObserver
 from vgo import HeadingObserver
 from fgo import AltitudeObserver
+from gps import EmulatedXplaneGPS
 from utils import get_ip_address, wrap
+from truthdata import TruthData
+from autopilot import Autopilot
 
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger("shumai")
 
 display = Display()
+TD = TruthData()
 
 LEVELS = {'debug': logging.DEBUG,
           'info': logging.INFO,
@@ -62,25 +66,31 @@ class Shumai:
         self.Vair = 0
         self.attitude_observer = AttitudeObserver()
         self.heading_observer = HeadingObserver()
+        self.altitude_observer = AltitudeObserver()
         # Comming soon:
         # self.navigation_observer = NavigationObserver()
         self.imu = imu
         self.differential_pressure_sensor = differential_pressure_sensor
         self.static_pressure_sensor = static_pressure_sensor
         self.magnetometer = magnetometer
-        self.gps = gps
-        self.dt = 0.05
+        self.gps = EmulatedXplaneGPS(delay=1.1, Hz=2)
         self.last_time = datetime.now()
 
     def loop(self):
-        self.dt = (datetime.now()-self.last_time).microseconds/1000000.0
+        TD.DT = (datetime.now()-self.last_time).microseconds/1000000.0
         self.last_time = datetime.now()
         p, q, r = self.imu.read_gyros()
         ax, ay, az = self.imu.read_accelerometers()
         Vair = self.differential_pressure_sensor.read_airspeed() * 0.5144444444 # kias to meters per second
-        phi, theta = self.attitude_observer.estimate_roll_and_pitch(p, q, r, Vair, ax, ay, az, self.dt)
+        phi, theta = self.attitude_observer.estimate_roll_and_pitch(p, q, r, Vair, ax, ay, az, TD.DT)
         bx, by, bz = self.magnetometer.read_magnetometer()
-        psi = self.heading_observer.estimate_heading(bx, by, bz, phi, theta, q, r, self.dt)
+        psi = self.heading_observer.estimate_heading(bx, by, bz, phi, theta, q, r, TD.DT)
+        gps_data = self.gps.update(TD.DT)
+        display.register_scalars({"gps_lat": gps_data['latitude'],
+                                  "gps_lon": gps_data['longitude'],
+                                  "gps_alt": gps_data['altitude'],
+                                  "gps_sog": gps_data['speed_over_ground'],})
+        #altitude = self.estimate(theta, Vair, gps_data['altitude'], DT)
         return {
             "roll": degrees(phi),
             "pitch": degrees(theta),
@@ -96,11 +106,11 @@ class XplaneListener(DatagramProtocol):
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((get_ip_address(),49998))
-        self.dt = 0.05
         self.last_time = datetime.now()
         self.ekf = Shumai(self, self, self, self, self) # hack for X-Plane
         self.bxyz = matrix("0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0")
         self.mxyz = matrix("25396.8; 2011.7; 38921.5") # some sort of magnetic field strength table in nanotesla units
+        self.autopilot = Autopilot()
 
     def datagramReceived(self, data, (host, port)):
         """
@@ -108,31 +118,35 @@ class XplaneListener(DatagramProtocol):
         I should probably document this more. Bug me until I do so...
         """
         fmt = '<f'
-        self.Vair = unpack_from(fmt, data, 9)[0]
-        self.az = 0 - unpack_from(fmt, data, 9+16+36)[0]
-        self.ax = unpack_from(fmt, data, 9+20+36)[0]
-        self.ay = unpack_from(fmt, data, 9+24+36)[0]
-        self.q = radians(unpack_from(fmt, data, 9+108+0)[0])
-        self.p = radians(unpack_from(fmt, data, 9+108+4)[0])
-        self.r = radians(unpack_from(fmt, data, 9+108+8)[0])
-        self.pitch = radians(unpack_from(fmt, data, 9+144+0)[0])
-        self.roll = radians(unpack_from(fmt, data, 9+144+4)[0])
-        self.heading = radians(unpack_from(fmt, data, 9+144+8)[0])
-        self.latitude = unpack_from(fmt, data, 9+180+0)[0]
-        self.longitude = unpack_from(fmt, data, 9+180+4)[0]
-        self.speed_over_ground = unpack_from(fmt, data, 9+12)[0]
-        display.register_scalars({"lat":self.latitude,"lon":self.longitude,"sog":self.speed_over_ground})
-        self.generate_virtual_magnetometer_readings(self.roll, self.pitch, self.heading)
-        display.register_scalars({"bx":self.bx,"by":self.by,"bz":self.bz,"true heading":degrees(self.heading)})
-        logger.debug("Vair %0.1f, accelerometers (%0.2f, %0.2f, %0.2f), gyros (%0.2f, %0.2f, %0.2f)" % (self.Vair, self.ax, self.ay, self.az, self.p, self.q, self.r))
+        TD.AIRSPEED = unpack_from(fmt, data, 9)[0]
+        TD.AZ = 0 - unpack_from(fmt, data, 9+16+36)[0]
+        TD.AX = unpack_from(fmt, data, 9+20+36)[0]
+        TD.AY = unpack_from(fmt, data, 9+24+36)[0]
+        TD.Q = radians(unpack_from(fmt, data, 9+108+0)[0])
+        TD.P = radians(unpack_from(fmt, data, 9+108+4)[0])
+        TD.R = radians(unpack_from(fmt, data, 9+108+8)[0])
+        TD.PITCH = radians(unpack_from(fmt, data, 9+144+0)[0])
+        TD.ROLL = radians(unpack_from(fmt, data, 9+144+4)[0])
+        TD.HEADING = radians(unpack_from(fmt, data, 9+144+8)[0])
+        TD.LATITUDE = unpack_from(fmt, data, 9+180+0)[0]
+        TD.LONGITUDE = unpack_from(fmt, data, 9+180+4)[0]
+        TD.ALTITUDE = unpack_from(fmt, data, 9+180+20)[0]
+        TD.SPEEDOVERGROUND = unpack_from(fmt, data, 9+12)[0]
+        display.register_scalars({"lat":TD.LATITUDE,"lon":TD.LONGITUDE,"alt":TD.ALTITUDE,"sog":TD.SPEEDOVERGROUND})
+        self.generate_virtual_magnetometer_readings(TD.ROLL,TD.PITCH,TD.HEADING)
+        display.register_scalars({"bx":TD.BX,"by":TD.BY,"bz":TD.BZ,"true heading":degrees(TD.HEADING)})
+        logger.debug("Vair %0.1f, accelerometers (%0.2f, %0.2f, %0.2f), gyros (%0.2f, %0.2f, %0.2f)" % (TD.AIRSPEED, TD.AX, TD.AY, TD.AZ, TD.P, TD.Q, TD.R))
         current_state = self.ekf.loop()
-        display.register_scalars({"Psi error":current_state['yaw']-degrees(self.heading)})
+        display.register_scalars({"Psi error":current_state['yaw']-degrees(TD.HEADING)})
         if display.curses_available is True:
             display.draw()
         else:
             sys.stdout.write("%sRoll = %f, pitch = %f      " % (chr(13), current_state['roll'], current_state['pitch']))
             sys.stdout.flush()
-        FOUT.writerow([degrees(self.roll), degrees(self.pitch), current_state['roll'], current_state['pitch'], current_state['roll'] - degrees(self.roll), current_state['pitch'] - degrees(self.pitch)])
+        FOUT.writerow([degrees(TD.ROLL), degrees(TD.PITCH), current_state['roll'], current_state['pitch'], current_state['roll'] - degrees(TD.ROLL), current_state['pitch'] - degrees(TD.PITCH)])
+        self.autopilot.heading_hold()
+        self.sendJoystick((self.autopilot.roll_hold(), self.autopilot.pitch_hold()), 0)
+        self.sendThrottle(self.autopilot.throttle())
 
     def generate_virtual_magnetometer_readings(self, phi, theta, psi):
         psi = wrap(psi)
@@ -145,32 +159,47 @@ class XplaneListener(DatagramProtocol):
         self.bxyz[2,0] = (cos(phi) * sin(theta) * cos(psi)) + (sin(phi) * sin(psi))
         self.bxyz[2,1] = (cos(phi) * sin(theta) * sin(psi)) - (sin(phi) * cos(psi))
         self.bxyz[2,2] = cos(phi) * cos(theta)
-        # self.bxyz[0,0] = cos(theta) * cos(psi)
-        # self.bxyz[0,1] = (sin(phi) * sin(theta) * cos(psi)) - (cos(phi) * sin(psi))
-        # self.bxyz[0,2] = (cos(phi) * sin(theta) * cos(psi)) + (sin(phi) * sin(psi))
-        # self.bxyz[1,0] = cos(theta) * sin(psi)
-        # self.bxyz[1,1] = (sin(phi) *sin(theta) * sin(psi)) + (cos(phi) * cos(psi))
-        # self.bxyz[1,2] = (cos(phi) * sin(theta) * sin(psi)) - (sin(phi) * cos(psi))
-        # self.bxyz[2,0] = -sin(theta)
-        # self.bxyz[2,1] = sin(phi) * cos(theta)
-        # self.bxyz[2,2] = cos(phi) * cos(theta)
         display.register_matrices({"bxyz":self.bxyz})
         b = self.bxyz * self.mxyz
-        self.bx = b[0,0]
-        self.by = b[1,0]
-        self.bz = b[2,0]
+        TD.BX = b[0,0]
+        TD.BY = b[1,0]
+        TD.BZ = b[2,0]
 
     def read_gyros(self):
-        return self.p, self.q, self.r
+        return TD.P, TD.Q, TD.R
 
     def read_accelerometers(self):
-        return self.ax, self.ay, self.az
+        return TD.AX, TD.AY, TD.AZ
 
     def read_airspeed(self):
-        return self.Vair
+        return TD.AIRSPEED
 
     def read_magnetometer(self):
-        return self.bx, self.by, self.bz
+        return TD.BX, TD.BY, TD.BZ
+
+    def sendThrottle(self, throttle):
+        data_selection_packet = "DATA0\x19\x00\x00\x00" # throttle
+        data = pack('ffffffff', throttle, throttle, throttle, throttle, throttle, throttle, throttle, throttle)
+        data_selection_packet += data
+        self.sock.sendto(data_selection_packet,(get_ip_address(),49000))
+
+    def sendJoystick(self, joystick, rudder):
+        data_selection_packet = "DATA0\x08\x00\x00\x00" # joystick
+        data = pack('ffffffff', joystick[1], joystick[0], rudder, 0, 0, 0, 0, 0)
+        data_selection_packet += data
+        self.sock.sendto(data_selection_packet,(get_ip_address(),49000))
+
+    def sendGearBrakes(self, gear, brakes):
+        data_selection_packet = "DATA0\x0E\x00\x00\x00" # gear/brakes
+        data = pack('ffffffff', gear, brakes, brakes, brakes, 0, 0, 0, 0)
+        data_selection_packet += data
+        self.sock.sendto(data_selection_packet,(get_ip_address(),49000))
+
+    def sendFlaps(self, flaps):
+        data_selection_packet = "DATA0\x0D\x00\x00\x00" # flaps
+        data = pack('ffffffff', flaps, flaps, flaps, flaps, flaps, flaps, flaps, flaps)
+        data_selection_packet += data
+        self.sock.sendto(data_selection_packet,(get_ip_address(),49000))
 
 class XplaneIMU():
 

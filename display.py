@@ -1,5 +1,3 @@
-
-
 class Display(object):
     """
     This is a library for doing a comprehensive, realtime display of all the states within the EKF.
