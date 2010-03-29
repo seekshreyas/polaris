@@ -31,14 +31,13 @@ Windows Installation
 
 Future
 =============
-1. Yaw estimate (see [this](http://gist.github.com/322555))
-2. Position estimate
-3. Wind vector estimate
-4. Altitude estimate
-5. Airspeed estimate
-6. Tuning / noise / real hardware testing (perhaps a genetic algorithm for tuning)
-7. Porting to other languages/platforms (microcontrollers)
-8. Email Austin about virtual magnetometer in X-Plane
+1. Position estimate
+2. Wind vector estimate
+3. Altitude estimate
+4. Airspeed estimate
+5. Tuning / noise / real hardware testing (perhaps a genetic algorithm for tuning)
+6. Porting to other languages/platforms (microcontrollers)
+7. Email Austin about virtual magnetometer in X-Plane
 
 FAQ
 ===

@@ -7,7 +7,7 @@ TD = TruthData()
 display = Display()
 
 class Autopilot:
-    
+
     def __init__(self):
         self.pitch_cmd = 90.0
         self.roll_cmd = 0.0
@@ -42,12 +42,12 @@ class Autopilot:
         display.register_scalars({"roll_cmd": self.roll_cmd,"psi_dot_cmd": degrees(psi_dot_cmd),})
         # self.roll_cmd = kp_psi * hdg_deweight * self.condition_heading(degrees(TD.HEADING))
         return self.roll_cmd
-    
+
     def pitch_hold(self):
         kp_theta = 1.0
         self.ele_cmd = kp_theta * (self.pitch_cmd - degrees(TD.PITCH)) * self.xplane_gain
         return self.ele_cmd
-    
+
     def roll_hold(self):
         kp_phi = 1.0
         self.ail_cmd = kp_phi * (self.roll_cmd - degrees(TD.ROLL)) * self.xplane_gain

@@ -12,7 +12,7 @@ import csv
 from display import Display
 from ekf import AttitudeObserver
 from vgo import HeadingObserver
-from fgo import AltitudeObserver
+from fgo import AltitudeObserver, WindObserver
 from gps import EmulatedXplaneGPS
 from utils import get_ip_address, wrap
 from truthdata import TruthData
@@ -67,6 +67,7 @@ class Shumai:
         self.attitude_observer = AttitudeObserver()
         self.heading_observer = HeadingObserver()
         self.altitude_observer = AltitudeObserver()
+        self.wind_observer = WindObserver()
         # Comming soon:
         # self.navigation_observer = NavigationObserver()
         self.imu = imu
@@ -90,6 +91,10 @@ class Shumai:
                                   "gps_lon": gps_data['longitude'],
                                   "gps_alt": gps_data['altitude'],
                                   "gps_sog": gps_data['speed_over_ground'],})
+        altitude = self.altitude_observer.estimate(theta, Vair, gps_data['altitude'], TD.DT)
+        display.register_scalars({"alt_est": altitude})
+        wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'], TD.HEADING, TD.DT)
+        display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity})
         #altitude = self.estimate(theta, Vair, gps_data['altitude'], DT)
         return {
             "roll": degrees(phi),
