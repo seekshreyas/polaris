@@ -2,6 +2,7 @@ from math import radians, sin, sqrt, atan2, cos
 from time import time
 from utils import safe_tangent, wrap
 from truthdata import TruthData
+from geonavigation import gps_coords_to_heading
 
 TD = TruthData()
 
@@ -14,6 +15,7 @@ class EmulatedXplaneGPS:
         self.update_dt = 1.0/Hz
         self.last_update = time() + delay
         self.speed_over_ground = 0
+        self.course_over_ground = 0
         self.latitude = 0
         self.longitude = 0
         self.altitude = 0
@@ -38,7 +40,7 @@ class EmulatedXplaneGPS:
             self.latitude = self.lat.pop()
             self.longitude = self.lon.pop()
             self.altitude = self.alt.pop()
-            self.course_over_ground = gps_coords_to_heading(self.last_latitude, self.last_longitude, self.latitude, self.longitude)
+            self.course_over_ground = gps_coords_to_heading(self.latitude, self.longitude, self.last_latitude, self.last_longitude) # looks like there's an hpath variable available in X-Plane that should do the trick
         return { "speed_over_ground": self.speed_over_ground,
                  "course_over_ground": self.course_over_ground,
                  "latitude": self.latitude,
