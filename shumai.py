@@ -93,7 +93,7 @@ class Shumai:
                                   "gps_sog": gps_data['speed_over_ground'],})
         altitude = self.altitude_observer.estimate(theta, Vair, gps_data['altitude'], TD.DT)
         display.register_scalars({"alt_est": altitude})
-        wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'], TD.HEADING, TD.DT)
+        wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'], gps_data['course_over_ground'], TD.DT)
         display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity})
         #altitude = self.estimate(theta, Vair, gps_data['altitude'], DT)
         return {

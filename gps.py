@@ -17,6 +17,8 @@ class EmulatedXplaneGPS:
         self.latitude = 0
         self.longitude = 0
         self.altitude = 0
+        self.last_latitude = 0
+        self.last_longitude = 0
         self.sog = []
         self.lat = []
         self.lon = []
@@ -31,10 +33,14 @@ class EmulatedXplaneGPS:
         if now - self.last_update > self.update_dt:
             self.last_update = now
             self.speed_over_ground = self.sog.pop()
+            self.last_latitude = self.latitude
+            self.last_longitude = self.longitude
             self.latitude = self.lat.pop()
             self.longitude = self.lon.pop()
             self.altitude = self.alt.pop()
+            self.course_over_ground = gps_coords_to_heading(self.last_latitude, self.last_longitude, self.latitude, self.longitude)
         return { "speed_over_ground": self.speed_over_ground,
+                 "course_over_ground": self.course_over_ground,
                  "latitude": self.latitude,
                  "longitude": self.longitude,
                  "altitude": self.altitude }
