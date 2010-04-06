@@ -247,6 +247,6 @@ if __name__ == "__main__":
         xplane_imu = XplaneIMU()
         xplane_imu.run()
     except Exception, e:
-        del xplane_imu, display
+        #del xplane_imu, display
         print e
         exit()
