@@ -16,7 +16,7 @@ from fgo import AltitudeObserver, WindObserver
 from gps import EmulatedXplaneGPS
 from utils import get_ip_address, wrap
 from truthdata import TruthData
-from autopilot import Autopilot
+# from autopilot import Autopilot
 
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger("shumai")
