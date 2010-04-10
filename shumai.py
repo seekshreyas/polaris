@@ -16,7 +16,7 @@ from fgo import AltitudeObserver, WindObserver
 from gps import EmulatedXplaneGPS
 from utils import get_ip_address, wrap
 from truthdata import TruthData
-# from autopilot import Autopilot
+from autopilot import Autopilot
 
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger("shumai")
@@ -90,11 +90,11 @@ class Shumai:
         display.register_scalars({"gps_lat": gps_data['latitude'],
                                   "gps_lon": gps_data['longitude'],
                                   "gps_alt": gps_data['altitude'],
-                                  "gps_sog": gps_data['speed_over_ground'],})
+                                  "gps_sog": gps_data['speed_over_ground'],}, "Sensors")
         altitude = self.altitude_observer.estimate(theta, Vair, gps_data['altitude'], TD.DT)
-        display.register_scalars({"alt_est": altitude})
+        display.register_scalars({"alt_est": altitude}, "Estimates")
         wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'], gps_data['course_over_ground'], TD.DT)
-        display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity, "COG": gps_data['course_over_ground']})
+        display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity, "COG": gps_data['course_over_ground']}, "Estimates")
         #altitude = self.estimate(theta, Vair, gps_data['altitude'], DT)
         return {
             "roll": degrees(phi),
@@ -137,18 +137,19 @@ class XplaneListener(DatagramProtocol):
         TD.LONGITUDE = unpack_from(fmt, data, 9+180+4)[0]
         TD.ALTITUDE = unpack_from(fmt, data, 9+180+20)[0]
         TD.SPEEDOVERGROUND = unpack_from(fmt, data, 9+12)[0]
-        display.register_scalars({"lat":TD.LATITUDE,"lon":TD.LONGITUDE,"alt":TD.ALTITUDE,"sog":TD.SPEEDOVERGROUND})
+        display.register_scalars({"lat":TD.LATITUDE,"lon":TD.LONGITUDE,"alt":TD.ALTITUDE,"sog":TD.SPEEDOVERGROUND}, "Sensors")
         self.generate_virtual_magnetometer_readings(TD.ROLL,TD.PITCH,TD.HEADING)
-        display.register_scalars({"bx":TD.BX,"by":TD.BY,"bz":TD.BZ,"true heading":degrees(TD.HEADING)})
+        display.register_scalars({"bx":TD.BX,"by":TD.BY,"bz":TD.BZ,"true heading":degrees(TD.HEADING)}, "Sensors")
         logger.debug("Vair %0.1f, accelerometers (%0.2f, %0.2f, %0.2f), gyros (%0.2f, %0.2f, %0.2f)" % (TD.AIRSPEED, TD.AX, TD.AY, TD.AZ, TD.P, TD.Q, TD.R))
         current_state = self.ekf.loop()
-        display.register_scalars({"Psi error":current_state['yaw']-degrees(TD.HEADING)})
+        display.register_scalars({"Psi error":current_state['yaw']-degrees(TD.HEADING)}, "Performance")
         if display.curses_available is True:
             display.draw()
         else:
             sys.stdout.write("%sRoll = %f, pitch = %f      " % (chr(13), current_state['roll'], current_state['pitch']))
             sys.stdout.flush()
-        FOUT.writerow([degrees(TD.ROLL), degrees(TD.PITCH), current_state['roll'], current_state['pitch'], current_state['roll'] - degrees(TD.ROLL), current_state['pitch'] - degrees(TD.PITCH)])
+        #FOUT.writerow([degrees(TD.ROLL), degrees(TD.PITCH), current_state['roll'], current_state['pitch'], current_state['roll'] - degrees(TD.ROLL), current_state['pitch'] - degrees(TD.PITCH)])
+        display.register_scalars({"Phi error":current_state['roll']-degrees(TD.ROLL), "Theta error":current_state['pitch'] - degrees(TD.PITCH)}, "Performance")
         self.autopilot.heading_hold()
         self.sendJoystick((self.autopilot.roll_hold(), self.autopilot.pitch_hold()), 0)
         self.sendThrottle(self.autopilot.throttle())

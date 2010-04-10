@@ -54,5 +54,5 @@ class HeadingObserver:
         psi_error = self.psi_estimate - psi_measured
         self.psi_estimate += self.k_psi * psi_error
         logger.info("Heading %f" % self.psi_estimate)
-        display.register_scalars({"Psi":degrees(self.psi_estimate),"psi_dot":degrees(psi_dot)})
+        display.register_scalars({"Psi":degrees(self.psi_estimate)}, "Estimates")
         return self.psi_estimate

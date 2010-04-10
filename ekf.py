@@ -145,19 +145,17 @@ class AttitudeObserver:
         self.Pz = (self.I - self.Lz * self.Cz) * self.Pz
 
     def register_states(self):
-        scalars = {"p (rad)":self.p,
-                   "q (rad)":self.q,
-                   "r (rad)":self.r,
+        scalars = {"p (deg)":degrees(self.p),
+                   "q (deg)":degrees(self.q),
+                   "r (deg)":degrees(self.r),
                    "ax":self.ax,
                    "ay":self.ay,
                    "az":self.az,
-                   "Acc mag":self.acceleration_magnitude,
-                   "Acc wght":self.acceleration_weight,
+                   # "Acc mag":self.acceleration_magnitude,
+                   # "Acc wght":self.acceleration_weight,
                    "axhat":self.axhat,
                    "ayhat":self.ayhat,
-                   "azhat":self.azhat,
-                   "Phi (deg)":degrees(self.phi),
-                   "Theta (deg)":degrees(self.theta),}
+                   "azhat":self.azhat,}
         matrices = {"A":self.A,
                     "Q":self.Q,
                     "Px":self.Px,
@@ -169,8 +167,11 @@ class AttitudeObserver:
                     "Lx":self.Lx,
                     "Ly":self.Ly,
                     "Lz":self.Lz,}
-        display.register_scalars(scalars)
-        display.register_matrices(matrices)
+        estimates = {"Phi (deg)":degrees(self.phi),
+                     "Theta (deg)":degrees(self.theta),}
+        display.register_scalars(scalars, "Sensors")
+        display.register_scalars(estimates, "Estimates")
+        display.register_matrices(matrices, "Internal states")
 
     def estimate_roll_and_pitch(self, p, q, r, Vair, ax, ay, az, dt):
         self.p, self.q, self.r = p, q, r

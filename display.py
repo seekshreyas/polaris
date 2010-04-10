@@ -12,8 +12,7 @@ class Display(object):
         return cls._instance
 
     def __init__(self):
-        self.scalars = {}
-        self.matrices = {}
+        self.categories = {}
         try:
             import curses
             self.curses_available = True
@@ -26,19 +25,21 @@ class Display(object):
         if self.curses_available:
             curses.endwin()
 
-    def register_scalar(self, label, scalar):
-        self.scalars[label] = scalar
+    def register_scalar(self, label, scalar, category="Internal states"):
+        self.categories.setdefault(category, {"scalars":{},"matrices":{}})
+        self.categories[category]['scalars'][label] = scalar
 
-    def register_scalars(self, scalars):
+    def register_scalars(self, scalars, category="Internal states"):
         for label, scalar in scalars.items():
-            self.register_scalar(label, scalar)
+            self.register_scalar(label, scalar, category)
 
-    def register_matrix(self, label, matrix):
-        self.matrices[label] = matrix
+    def register_matrix(self, label, matrix, category="Internal states"):
+        self.categories.setdefault(category, {"scalars":{},"matrices":{}})
+        self.categories[category]['matrices'][label] = matrix
 
-    def register_matrices(self, matrices):
+    def register_matrices(self, matrices, category="Internal states"):
         for label, matrix in matrices.items():
-            self.register_matrix(label, matrix)
+            self.register_matrix(label, matrix, category)
 
     def display_matrix(self, m, x, y, precision=2, title=None):
         a, b = self.get_matrix_display_size(m, precision=precision)
@@ -68,35 +69,43 @@ class Display(object):
     def display_state(self, precision):
         self.screen.erase()
         rows, cols = self.screen.getmaxyx()
-        scalar_count = len(self.scalars)
         self.screen.addstr(0, 0, "Shumai: the Extended Kalman Filter for aircraft")
         i = 1
         x, y = 2, 0
-        for s in self.scalars.keys():
-            if y + precision + len(s) > cols:
-                x += 1
-                y = 0
-            if x < rows and y + precision + len(s) < cols:
-                self.screen.addstr(x, y, "%s: %+0.*f" % (s, precision, self.scalars[s]))
-            y += 20 + precision
-            i += 1
-        x, y = x + 2, 0
-        maxheight = 0
-        for m in self.matrices.keys():
-            matrix = self.matrices[m]
-            a, b = self.get_matrix_display_size(matrix, precision=precision)
-            if a > maxheight:
-                maxheight = a
-            if b + y > cols-10:
-                y = 0
+        for category in sorted(self.categories.keys(), key=str.lower):
+            self.screen.addstr(x, y, "%s:" % category)
+            x += 2
+            for s in sorted(self.categories[category]['scalars'].keys(), key=str.lower):
+                if y + precision + len(s) > cols:
+                    x += 1
+                    y = 0
+                if x < rows and y + precision + len(s) < cols:
+                    self.screen.addstr(x, y, "%s: %+0.*f" % (s, precision, self.categories[category]['scalars'][s]))
+                y += 20 + precision
+                i += 1
+            if len(self.categories[category]['scalars']) > 0:
+                x, y = x + 2, 0
+            maxheight = 0
+            for m in sorted(self.categories[category]['matrices'].keys(), key=str.lower):
+                matrix = self.categories[category]['matrices'][m]
+                a, b = self.get_matrix_display_size(matrix, precision=precision)
+                if a > maxheight:
+                    maxheight = a
+                if b + y > cols-10:
+                    y = 0
+                    x += maxheight + 1
+                    maxheight = 0
+                c, d = self.display_matrix(matrix, x, y, precision=precision, title=m)
+                y += b + 3
+            if len(self.categories[category]['matrices']) > 0:
+                x += maxheight + 2
+            else:
                 x += maxheight + 1
-                maxheight = 0
-            c, d = self.display_matrix(matrix, x, y, precision=precision, title=m)
-            y += b + 3
+            y = 0
         # point the cursor in the bottom right corner so it doesn't hide anything
         self.screen.move(rows-1, cols-1)
 
-    def draw(self, precision=5):
+    def draw(self, precision=4):
         self.display_state(precision=precision)
         rows, cols = self.screen.getmaxyx()
         self.screen.move(rows-1, cols-1)
