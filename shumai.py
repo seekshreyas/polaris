@@ -16,7 +16,10 @@ from fgo import AltitudeObserver, WindObserver
 from gps import EmulatedXplaneGPS
 from utils import get_ip_address, wrap
 from truthdata import TruthData
-from autopilot import Autopilot
+try:
+    from autopilot import Autopilot
+except:
+    pass
 
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger("shumai")
@@ -115,7 +118,10 @@ class XplaneListener(DatagramProtocol):
         self.ekf = Shumai(self, self, self, self, self) # hack for X-Plane
         self.bxyz = matrix("0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0")
         self.mxyz = matrix("25396.8; 2011.7; 38921.5") # some sort of magnetic field strength table in nanotesla units
-        self.autopilot = Autopilot()
+        try:
+            self.autopilot = Autopilot()
+        except:
+            pass
 
     def datagramReceived(self, data, (host, port)):
         """
@@ -150,9 +156,12 @@ class XplaneListener(DatagramProtocol):
             sys.stdout.flush()
         #FOUT.writerow([degrees(TD.ROLL), degrees(TD.PITCH), current_state['roll'], current_state['pitch'], current_state['roll'] - degrees(TD.ROLL), current_state['pitch'] - degrees(TD.PITCH)])
         display.register_scalars({"Phi error":current_state['roll']-degrees(TD.ROLL), "Theta error":current_state['pitch'] - degrees(TD.PITCH)}, "Performance")
-        self.autopilot.heading_hold()
-        self.sendJoystick((self.autopilot.roll_hold(), self.autopilot.pitch_hold()), 0)
-        self.sendThrottle(self.autopilot.throttle())
+        try:
+            self.autopilot.heading_hold()
+            self.sendJoystick((self.autopilot.roll_hold(), self.autopilot.pitch_hold()), 0)
+            self.sendThrottle(self.autopilot.throttle())
+        except:
+            pass
 
     def generate_virtual_magnetometer_readings(self, phi, theta, psi):
         psi = wrap(psi)
