@@ -21,12 +21,14 @@ class EmulatedXplaneGPS:
         self.altitude = 0
         self.last_latitude = 0
         self.last_longitude = 0
+        self.cog = []
         self.sog = []
         self.lat = []
         self.lon = []
         self.alt = []
 
     def update(self, dt):
+        self.cog.append(TD.COURSEOVERGROUND)
         self.sog.append(TD.SPEEDOVERGROUND)
         self.lat.append(TD.LATITUDE)
         self.lon.append(TD.LONGITUDE)
@@ -40,7 +42,7 @@ class EmulatedXplaneGPS:
             self.latitude = self.lat.pop()
             self.longitude = self.lon.pop()
             self.altitude = self.alt.pop()
-            self.course_over_ground = gps_coords_to_heading(self.latitude, self.longitude, self.last_latitude, self.last_longitude) # looks like there's an hpath variable available in X-Plane that should do the trick
+            self.course_over_ground = self.cog.pop()
         return { "speed_over_ground": self.speed_over_ground,
                  "course_over_ground": self.course_over_ground,
                  "latitude": self.latitude,

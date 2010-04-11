@@ -36,7 +36,7 @@ LEVELS = {'debug': logging.DEBUG,
 FOUT = csv.writer(open('data.csv', 'w'), delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
 
 UDP_PORT=49045 # was 49503
-UDP_SENDTO_PORT=49501
+UDP_SENDTO_PORT=49001
 
 """
 Please read the documentation on http://dronedynamics.com/shumai-the-extended-kalman-filter/
@@ -86,6 +86,7 @@ class Shumai:
         p, q, r = self.imu.read_gyros()
         ax, ay, az = self.imu.read_accelerometers()
         Vair = self.differential_pressure_sensor.read_airspeed() * 0.5144444444 # kias to meters per second
+        display.register_scalars({"Vair":Vair/0.5144444444}, "Sensors")
         phi, theta = self.attitude_observer.estimate_roll_and_pitch(p, q, r, Vair, ax, ay, az, TD.DT)
         bx, by, bz = self.magnetometer.read_magnetometer()
         psi = self.heading_observer.estimate_heading(bx, by, bz, phi, theta, q, r, TD.DT)
@@ -96,9 +97,10 @@ class Shumai:
                                   "gps_sog": gps_data['speed_over_ground'],}, "Sensors")
         altitude = self.altitude_observer.estimate(theta, Vair, gps_data['altitude'], TD.DT)
         display.register_scalars({"alt_est": altitude}, "Estimates")
+        display.register_scalars({"Altitude": altitude - TD.ALTITUDE}, "Performance")
         wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'], gps_data['course_over_ground'], TD.DT)
-        display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity, "COG": gps_data['course_over_ground']}, "Estimates")
-        #altitude = self.estimate(theta, Vair, gps_data['altitude'], DT)
+        display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity}, "Estimates")
+        display.register_scalars({"Wind dir error": wind_direction - TD.WIND_DIRECTION, "Wind vel error": wind_velocity - TD.WIND_VELOCITY}, "Performance")
         return {
             "roll": degrees(phi),
             "pitch": degrees(theta),
@@ -133,17 +135,20 @@ class XplaneListener(DatagramProtocol):
         TD.AZ = 0 - unpack_from(fmt, data, 9+16+36)[0]
         TD.AX = unpack_from(fmt, data, 9+20+36)[0]
         TD.AY = unpack_from(fmt, data, 9+24+36)[0]
+        TD.WIND_VELOCITY = unpack_from(fmt, data, 9+72+12)[0]
+        TD.WIND_DIRECTION = unpack_from(fmt, data, 9+72+16)[0]
         TD.Q = radians(unpack_from(fmt, data, 9+108+0)[0])
         TD.P = radians(unpack_from(fmt, data, 9+108+4)[0])
         TD.R = radians(unpack_from(fmt, data, 9+108+8)[0])
         TD.PITCH = radians(unpack_from(fmt, data, 9+144+0)[0])
         TD.ROLL = radians(unpack_from(fmt, data, 9+144+4)[0])
         TD.HEADING = radians(unpack_from(fmt, data, 9+144+8)[0])
-        TD.LATITUDE = unpack_from(fmt, data, 9+180+0)[0]
-        TD.LONGITUDE = unpack_from(fmt, data, 9+180+4)[0]
-        TD.ALTITUDE = unpack_from(fmt, data, 9+180+20)[0]
+        TD.COURSEOVERGROUND = radians(unpack_from(fmt, data, 9+144+8)[0])
+        TD.LATITUDE = unpack_from(fmt, data, 9+216+0)[0]
+        TD.LONGITUDE = unpack_from(fmt, data, 9+216+4)[0]
+        TD.ALTITUDE = unpack_from(fmt, data, 9+216+8)[0]
         TD.SPEEDOVERGROUND = unpack_from(fmt, data, 9+12)[0]
-        display.register_scalars({"lat":TD.LATITUDE,"lon":TD.LONGITUDE,"alt":TD.ALTITUDE,"sog":TD.SPEEDOVERGROUND}, "Sensors")
+        display.register_scalars({"lat":TD.LATITUDE,"lon":TD.LONGITUDE,"alt":TD.ALTITUDE,"sog":TD.SPEEDOVERGROUND,"cog":degrees(TD.COURSEOVERGROUND)}, "Sensors")
         self.generate_virtual_magnetometer_readings(TD.ROLL,TD.PITCH,TD.HEADING)
         display.register_scalars({"bx":TD.BX,"by":TD.BY,"bz":TD.BZ,"true heading":degrees(TD.HEADING)}, "Sensors")
         logger.debug("Vair %0.1f, accelerometers (%0.2f, %0.2f, %0.2f), gyros (%0.2f, %0.2f, %0.2f)" % (TD.AIRSPEED, TD.AX, TD.AY, TD.AZ, TD.P, TD.Q, TD.R))
@@ -245,6 +250,7 @@ class XplaneIMU():
         data_selection_packet += "\x06\x00\x00\x00" # temperature
         data_selection_packet += "\x11\x00\x00\x00" # gyros
         data_selection_packet += "\x12\x00\x00\x00" # pitch and roll (for sanity check)
+        data_selection_packet += "\x13\x00\x00\x00" # hpath (course over ground)
         data_selection_packet += "\x14\x00\x00\x00" # altimeter and GPS
         self.sock.sendto(data_selection_packet,(get_ip_address(),UDP_SENDTO_PORT))
 
