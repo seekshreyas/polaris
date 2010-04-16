@@ -3,7 +3,7 @@ import socket
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet import reactor
 from struct import unpack_from, pack
-from math import cos, sin, tan, atan, atan2, isnan, pi, degrees, radians, sqrt
+from math import cos, sin, tan, asin, atan, atan2, isnan, pi, degrees, radians, sqrt
 from numpy import matrix
 from datetime import datetime
 import logging
@@ -100,7 +100,15 @@ class Shumai:
         display.register_scalars({"Altitude": altitude - TD.ALTITUDE}, "Performance")
         wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'], gps_data['course_over_ground'], TD.DT)
         display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity}, "Estimates")
-        display.register_scalars({"Wind dir error": wind_direction - TD.WIND_DIRECTION, "Wind vel error": wind_velocity - TD.WIND_VELOCITY}, "Performance")
+        display.register_scalars({"Wdir error": wind_direction - TD.WIND_DIRECTION, "Wvel error": wind_velocity - TD.WIND_VELOCITY}, "Performance")
+        # Shoot, I forget what this is, something from Ryan
+        # //SOG[0] = 'data from gps'
+        # //u_dot = 'x accel from a2d'
+        # gamma = theta - avg_aoa;
+        # v = 0;
+        # w = airspeed*(sin(theta)*cos(gamma) - cos(theta)*sin(gamma));
+        # lin_accel_x = u_dot - (g*(-sin(theta)) - (r*v - q*w);
+        # SOG[0] += dt_gps*lin_accel_x;
         return {
             "roll": degrees(phi),
             "pitch": degrees(theta),
@@ -160,7 +168,7 @@ class XplaneListener(DatagramProtocol):
             sys.stdout.write("%sRoll = %f, pitch = %f      " % (chr(13), current_state['roll'], current_state['pitch']))
             sys.stdout.flush()
         #FOUT.writerow([degrees(TD.ROLL), degrees(TD.PITCH), current_state['roll'], current_state['pitch'], current_state['roll'] - degrees(TD.ROLL), current_state['pitch'] - degrees(TD.PITCH)])
-        display.register_scalars({"Phi error":current_state['roll']-degrees(TD.ROLL), "Theta error":current_state['pitch'] - degrees(TD.PITCH)}, "Performance")
+        display.register_scalars({"Phi error": current_state['roll'] - degrees(TD.ROLL), "Theta error": current_state['pitch'] - degrees(TD.PITCH), "Psi error": current_state['yaw'] - degrees(TD.HEADING)}, "Performance")
         try:
             self.autopilot.heading_hold()
             self.sendJoystick((self.autopilot.roll_hold(), self.autopilot.pitch_hold()), 0)
@@ -184,6 +192,15 @@ class XplaneListener(DatagramProtocol):
         TD.BX = b[0,0]
         TD.BY = b[1,0]
         TD.BZ = b[2,0]
+        # DCM
+        pitch = -atan2(self.bxyz[2,1], self.bxyz[2,2])
+        roll = asin(self.bxyz[2,0])
+        yaw = -atan2(self.bxyz[1,0], self.bxyz[0,0])
+        pitch = degrees(pitch)
+        roll = degrees(roll)
+        yaw = (degrees(yaw) + 360) % 360
+        display.register_scalars({"DCM-pitch": pitch, "DCM-roll": roll, "DCM-yaw": yaw}, "Estimates")
+        display.register_scalars({"DCM-pitch-e": pitch - degrees(TD.PITCH), "DCM-roll-e": roll - degrees(TD.ROLL), "DCM-yaw-e": yaw - degrees(TD.HEADING)}, "Performance")
 
     def read_gyros(self):
         return TD.P, TD.Q, TD.R
@@ -255,6 +272,14 @@ class XplaneIMU():
         self.sock.sendto(data_selection_packet,(get_ip_address(),UDP_SENDTO_PORT))
 
 if __name__ == "__main__":
+    try:
+        import urllib2
+        lat, lon = 47.27, 12.35
+        urllib2.urlopen('http://www.magnetic-declination.com/srvact/?lat=%f&lng=%f&s=ze2wfbco&act=1' % (lat, lon))
+        # s = key, and I need a key for it to not get a 401
+        # minutes / 60 to get decimal
+    except:
+        pass
     try:
         if len(sys.argv) > 1:
             level_name = sys.argv[1]

@@ -36,6 +36,7 @@ class WindObserver:
         wind_east_error = Vair * sin(psi) * cos(theta) - ground_speed * sin(course_over_ground) - self.We_fgo
         self.Wn_fgo += self.k * wind_north_error
         self.We_fgo += self.k * wind_east_error
+        display.register_scalars({"Wn error": wind_north_error, "We error": wind_east_error, "Wn_fgo": self.Wn_fgo, "We_fgo": self.We_fgo, "cos(psi)": cos(psi), "cos(theta)": cos(theta), "sin(psi)": sin(psi), "cos(cog)": cos(course_over_ground), "sin(cog)": sin(course_over_ground), "SoG": ground_speed, "Vair": Vair}, "Debugging")
         wind_direction = degrees(atan2(self.We_fgo,self.Wn_fgo))
         wind_velocity = sqrt(self.We_fgo**2 + self.Wn_fgo**2)
         return wind_direction, wind_velocity

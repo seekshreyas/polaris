@@ -1,4 +1,4 @@
-from math import cos, sin, atan2, pi, degrees
+from math import cos, sin, atan2, pi, degrees, radians
 from numpy import matrix
 import logging
 import logging.config
@@ -37,7 +37,7 @@ class HeadingObserver:
         self.mxyz = matrix("25396.8; 2011.7; 38921.5") # magnetic field strength for Corpus Christi in nanotesla units
 
     def magnetometer_readings_to_tilt_compensated_heading(self, bx, by, bz, phi, theta):
-        self.variation = 4.528986*(pi/180)
+        self.variation = radians(2.25) # 4.528986*(pi/180)
         Xh = bx * cos(theta) + by * sin(phi) * sin(theta) + bz * cos(phi) * sin(theta)
         Yh = by * cos(phi) - bz * sin(phi)
         heading = wrap((atan2(-Yh, Xh) + self.variation))
