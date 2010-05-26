@@ -21,6 +21,12 @@ try:
 except:
     pass
 
+def safe_get_ip_address():
+    try:
+        return get_ip_address()
+    except:
+        return "127.0.0.1"
+
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger("shumai")
 
@@ -98,7 +104,7 @@ class Shumai:
         altitude = self.altitude_observer.estimate(theta, Vair, gps_data['altitude'], TD.DT)
         display.register_scalars({"alt_est": altitude}, "Estimates")
         display.register_scalars({"Altitude": altitude - TD.ALTITUDE}, "Performance")
-        wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'], gps_data['course_over_ground'], TD.DT)
+        wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'] * .5144444444, radians(gps_data['course_over_ground']), TD.DT)
         display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity}, "Estimates")
         display.register_scalars({"Wdir error": wind_direction - TD.WIND_DIRECTION, "Wvel error": wind_velocity - TD.WIND_VELOCITY}, "Performance")
         # Shoot, I forget what this is, something from Ryan
@@ -123,7 +129,7 @@ class XplaneListener(DatagramProtocol):
 
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind((get_ip_address(),49998))
+        self.sock.bind((safe_get_ip_address(),49998))
         self.last_time = datetime.now()
         self.ekf = Shumai(self, self, self, self, self) # hack for X-Plane
         self.bxyz = matrix("0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0")
@@ -156,6 +162,7 @@ class XplaneListener(DatagramProtocol):
         TD.LONGITUDE = unpack_from(fmt, data, 9+216+4)[0]
         TD.ALTITUDE = unpack_from(fmt, data, 9+216+8)[0]
         TD.SPEEDOVERGROUND = unpack_from(fmt, data, 9+12)[0]
+        #display.register_scalars({"SOG":TD.SPEEDOVERGROUND, "IAS":TD.AIRSPEED}, "Testing")
         display.register_scalars({"lat":TD.LATITUDE,"lon":TD.LONGITUDE,"alt":TD.ALTITUDE,"sog":TD.SPEEDOVERGROUND,"cog":degrees(TD.COURSEOVERGROUND)}, "Sensors")
         self.generate_virtual_magnetometer_readings(TD.ROLL,TD.PITCH,TD.HEADING)
         display.register_scalars({"bx":TD.BX,"by":TD.BY,"bz":TD.BZ,"true heading":degrees(TD.HEADING)}, "Sensors")
@@ -218,25 +225,25 @@ class XplaneListener(DatagramProtocol):
         data_selection_packet = "DATA0\x19\x00\x00\x00" # throttle
         data = pack('ffffffff', throttle, throttle, throttle, throttle, throttle, throttle, throttle, throttle)
         data_selection_packet += data
-        self.sock.sendto(data_selection_packet,(get_ip_address(),49000))
+        self.sock.sendto(data_selection_packet,(safe_get_ip_address(),49000))
 
     def sendJoystick(self, joystick, rudder):
         data_selection_packet = "DATA0\x08\x00\x00\x00" # joystick
         data = pack('ffffffff', joystick[1], joystick[0], rudder, 0, 0, 0, 0, 0)
         data_selection_packet += data
-        self.sock.sendto(data_selection_packet,(get_ip_address(),49000))
+        self.sock.sendto(data_selection_packet,(safe_get_ip_address(),49000))
 
     def sendGearBrakes(self, gear, brakes):
         data_selection_packet = "DATA0\x0E\x00\x00\x00" # gear/brakes
         data = pack('ffffffff', gear, brakes, brakes, brakes, 0, 0, 0, 0)
         data_selection_packet += data
-        self.sock.sendto(data_selection_packet,(get_ip_address(),49000))
+        self.sock.sendto(data_selection_packet,(safe_get_ip_address(),49000))
 
     def sendFlaps(self, flaps):
         data_selection_packet = "DATA0\x0D\x00\x00\x00" # flaps
         data = pack('ffffffff', flaps, flaps, flaps, flaps, flaps, flaps, flaps, flaps)
         data_selection_packet += data
-        self.sock.sendto(data_selection_packet,(get_ip_address(),49000))
+        self.sock.sendto(data_selection_packet,(safe_get_ip_address(),49000))
 
 class XplaneIMU():
 
@@ -245,7 +252,7 @@ class XplaneIMU():
         We need to setup the conections, send a setup packet to X-Plane and then start listening.
         """
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind((get_ip_address(),49999))
+        self.sock.bind((safe_get_ip_address(),49999))
         self.send_data_selection_packet()
         self.listener = XplaneListener()
 
@@ -269,7 +276,7 @@ class XplaneIMU():
         data_selection_packet += "\x12\x00\x00\x00" # pitch and roll (for sanity check)
         data_selection_packet += "\x13\x00\x00\x00" # hpath (course over ground)
         data_selection_packet += "\x14\x00\x00\x00" # altimeter and GPS
-        self.sock.sendto(data_selection_packet,(get_ip_address(),UDP_SENDTO_PORT))
+        self.sock.sendto(data_selection_packet,(safe_get_ip_address(),UDP_SENDTO_PORT))
 
 if __name__ == "__main__":
     try:
