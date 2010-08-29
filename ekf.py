@@ -1,5 +1,6 @@
 from math import cos, sin, tan, atan, atan2, isnan, pi, degrees, radians, sqrt
 from numpy import matrix
+from scipy import linalg
 from datetime import datetime
 import logging
 import logging.config
@@ -9,6 +10,9 @@ import logging
 import logging.config
 from display import Display
 
+from truthdata import TruthData
+
+TD = TruthData()
 display = Display()
 
 logging.config.fileConfig("logging.conf")
@@ -294,3 +298,52 @@ class HeadingObserver:
         logger.info("Heading %f" % self.psi_estimate)
         display.register_scalars({"Psi":degrees(self.psi_estimate)})
         return self.psi_estimate
+
+class PositionObserver:
+    def __init__(self):
+        self.Qxt = 0.00025 # noise due to heading error & airspeed
+        self.Qot = 0.00025 # on track noise due to airspeed
+        self.Wn_est = 0.0
+        self.We_est = 0.0
+        self.A = matrix("0,0,-1,0; 0,0,0,-1; 0,0,0,0; 0,0,0,0")
+        self.I = matrix("1,0,0,0; 0,1,0,0; 0,0,1,0; 0,0,0,1")
+        self.P = matrix("1,0,0,0; 0,1,0,0; 0,0,1,0; 0,0,0,1")
+        self.Q = matrix("1,0,0,0; 0,1,0,0; 0,0,1,0; 0,0,0,1")
+        self.L = matrix("1,0,0,0; 0,1,0,0; 0,0,1,0; 0,0,0,1")
+        self.C = matrix("1,0,0,0;0,1,0,0")
+        self.X = matrix("0;0;0;0")
+        self.R = matrix("1,0;0,1")
+
+    def estimate(self, Vair, theta, psi, GPS_Pn, GPS_Pe, Wn_est, We_est, dt):
+        psi = TD.HEADING
+        theta = TD.PITCH
+        Vair = TD.AIRSPEED
+        Qpn = (self.Qot*abs(cos(psi))) + (self.Qxt*abs(sin(psi)))
+        Qpe = (self.Qot*abs(sin(psi))) + (self.Qxt*abs(cos(psi)))
+        Qwn = .00001
+        Qwe = .00001
+        self.Q = matrix("%f,0,0,0; 0,%f,0,0; 0,0,%f,0; 0,0,0,%f" % (Qpn, Qpe, Qwn, Qwe))
+
+        X_dot = matrix("%f;%f;%f;%f" % (Vair*cos(psi)*cos(theta) - Wn_est,
+                                        Vair*sin(psi)*cos(theta) - We_est,
+                                        0,
+                                        0))
+        self.X = self.X+X_dot*dt
+
+        self.A = matrix("0,0,-1,0;0,0,0,-1;0,0,0,0;0,0,0,0")
+
+        P_dot = self.A*self.P + self.P*self.A.transpose() + self.Q
+        self.P = self.P + P_dot*dt
+
+        self.C = matrix("1,0,0,0;0,1,0,0")
+
+        self.L = self.P*self.C.transpose()*linalg.inv(self.R+self.C*self.P*self.C.transpose())
+        #To invert the matrix it must not be singular ie have a det()=0
+
+        self.P = (self.I-self.L*self.C)*self.P
+
+        z = matrix("%f;%f" % (GPS_Pn,GPS_Pe))
+        h = matrix("%f;%f" % (self.X[0,0],self.X[1,0]))
+
+        self.X = self.X + self.L*(z-h)
+        return self.X

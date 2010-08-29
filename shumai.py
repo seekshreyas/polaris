@@ -10,7 +10,7 @@ import logging
 import logging.config
 import csv
 from display import Display
-from ekf import AttitudeObserver
+from ekf import AttitudeObserver, PositionObserver
 from vgo import HeadingObserver
 from fgo import AltitudeObserver, WindObserver
 from gps import EmulatedXplaneGPS
@@ -72,11 +72,14 @@ class Shumai:
 
     def __init__(self, imu, differential_pressure_sensor, static_pressure_sensor, magnetometer, gps):
         self.phi, self.theta, self.psi = 0, 0, 0
-        self.Vair = 0
+        self.Vair = 0.0
+        self.Wn = 0.0
+        self.We = 0.0
         self.attitude_observer = AttitudeObserver()
         self.heading_observer = HeadingObserver()
         self.altitude_observer = AltitudeObserver()
         self.wind_observer = WindObserver()
+        self.position_observer = PositionObserver()
         # Comming soon:
         # self.navigation_observer = NavigationObserver()
         self.imu = imu
@@ -102,10 +105,17 @@ class Shumai:
                                   "gps_alt": gps_data['altitude'],
                                   "gps_sog": gps_data['speed_over_ground'],}, "Sensors")
         altitude = self.altitude_observer.estimate(theta, Vair, gps_data['altitude'], TD.DT)
+        
         display.register_scalars({"alt_est": altitude}, "Estimates")
         display.register_scalars({"Altitude": altitude - TD.ALTITUDE}, "Performance")
-        wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'] * .5144444444, radians(gps_data['course_over_ground']), TD.DT)
-        display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity}, "Estimates")
+        wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'] * .5144444444, gps_data['course_over_ground'], TD.DT)
+        GPS_Pn, GPS_Pe = self.gps.relative_gps()
+        X = self.position_observer.estimate(Vair, theta, psi, GPS_Pn, GPS_Pe, self.Wn, self.We, TD.DT)
+        Pn, Pe, Wn, We = X[0,0], X[1,0], X[2,0], X[3,0]
+        wind_direction = degrees(atan2(We,Wn))
+        wind_velocity = sqrt(We**2 + Wn**2) / 0.5144444444 # convert from m/s to knots
+        display.register_scalars({"Pn": Pn,"Pe": Pe,"Wn": Wn,"We": We,}, "Dead reckoning")
+        display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity}, "Dead reckoning")
         display.register_scalars({"Wdir error": wind_direction - TD.WIND_DIRECTION, "Wvel error": wind_velocity - TD.WIND_VELOCITY}, "Performance")
         # Shoot, I forget what this is, something from Ryan
         # //SOG[0] = 'data from gps'
