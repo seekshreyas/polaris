@@ -31,5 +31,6 @@ class TruthData(object):
         self.LATITUDE = 0.0
         self.LONGITUDE = 0.0
         self.AIRSPEED = 0.0
+        self.TRUEAIRSPEED = 0.0
         self.SPEEDOVERGROUND = 0.0
         self.COURSEOVERGROUND = 0.0

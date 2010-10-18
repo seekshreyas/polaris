@@ -73,8 +73,6 @@ class Shumai:
     def __init__(self, imu, differential_pressure_sensor, static_pressure_sensor, magnetometer, gps):
         self.phi, self.theta, self.psi = 0, 0, 0
         self.Vair = 0.0
-        self.Wn = 0.0
-        self.We = 0.0
         self.attitude_observer = AttitudeObserver()
         self.heading_observer = HeadingObserver()
         self.altitude_observer = AltitudeObserver()
@@ -110,11 +108,11 @@ class Shumai:
         display.register_scalars({"Altitude": altitude - TD.ALTITUDE}, "Performance")
         wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'] * .5144444444, gps_data['course_over_ground'], TD.DT)
         GPS_Pn, GPS_Pe = self.gps.relative_gps()
-        X = self.position_observer.estimate(Vair, theta, psi, GPS_Pn, GPS_Pe, self.Wn, self.We, TD.DT)
+        X = self.position_observer.estimate(Vair, theta, psi, GPS_Pn, GPS_Pe, TD.DT)
         Pn, Pe, Wn, We = X[0,0], X[1,0], X[2,0], X[3,0]
         wind_direction = degrees(atan2(We,Wn))
-        wind_velocity = sqrt(We**2 + Wn**2) / 0.5144444444 # convert from m/s to knots
-        display.register_scalars({"Pn": Pn,"Pe": Pe,"Wn": Wn,"We": We,}, "Dead reckoning")
+        wind_velocity = sqrt(We**2 + Wn**2) # * 0.592483801 # convert from ft/s to knots
+        display.register_scalars({"Pn": Pn,"Pe": Pe,"Wn": Wn,"We": We,"GPS_Pn":GPS_Pn,"GPS_Pe":GPS_Pe}, "Dead reckoning")
         display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity}, "Dead reckoning")
         display.register_scalars({"Wdir error": wind_direction - TD.WIND_DIRECTION, "Wvel error": wind_velocity - TD.WIND_VELOCITY}, "Performance")
         # Shoot, I forget what this is, something from Ryan
@@ -156,6 +154,7 @@ class XplaneListener(DatagramProtocol):
         """
         fmt = '<f'
         TD.AIRSPEED = unpack_from(fmt, data, 9)[0]
+        TD.TRUEAIRSPEED = unpack_from(fmt, data, 9+8)[0]
         TD.AZ = 0 - unpack_from(fmt, data, 9+16+36)[0]
         TD.AX = unpack_from(fmt, data, 9+20+36)[0]
         TD.AY = unpack_from(fmt, data, 9+24+36)[0]

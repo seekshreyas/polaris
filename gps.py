@@ -36,8 +36,7 @@ class EmulatedXplaneGPS:
         lon = self.home_longitude - TD.LONGITUDE
         lamb = heading(self.home_latitude,self.home_longitude, TD.LATITUDE, TD.LONGITUDE)
         d = self.dist_to_wpt(self.home_latitude,self.home_longitude, TD.LATITUDE, TD.LONGITUDE)
-        lamb = radians(lamb)
-        display.register_scalars({"lambda":lamb,"d": d,}, "Dead reckoning")
+        display.register_scalars({"lambda":lamb,"d": d,"home_latitude":self.home_latitude,"home_longitude":self.home_longitude}, "Dead reckoning")
         Pn = cos(lamb)*d
         Pe = sin(lamb)*d
         return (Pn, Pe)
@@ -51,8 +50,9 @@ class EmulatedXplaneGPS:
         a = sin((delta_lat/2)*(pi/180))*sin((delta_lat/2)*(pi/180)) + cos(lat1*(pi/180))*cos(lat2*(pi/180)) * sin((delta_lon/2)*(pi/180))*sin((delta_lon/2)*(pi/180))
         c = 2 * atan2(sqrt(a),sqrt(1-a))
         d = R * c #Km
-        #d = d * 3280.8399 #ft
-        return d*1000 #meters
+        d = d * 3280.8399 #ft
+        return d
+        #return d*1000 #meters
 
 
 

@@ -8,7 +8,6 @@ from display import Display
 from utils import safe_tangent, wrap, GRAVITY
 import logging
 import logging.config
-from display import Display
 
 from truthdata import TruthData
 
@@ -132,13 +131,13 @@ class AttitudeObserver:
         if abs(degrees(self.phi)) > 90:
             if self.roll_is_departed == False:
                 self.roll_is_departed = True
-                logger.critical("Roll has departed.")
+                #logger.critical("Roll has departed.")
         else:
             self.roll_is_departed = False
         if abs(degrees(self.theta)) > 90:
             if self.pitch_is_departed == False:
                 self.pitch_is_departed = True
-                logger.critical("Pitch has departed.")
+                #logger.critical("Pitch has departed.")
         else:
             self.pitch_is_departed = False
 
@@ -314,18 +313,20 @@ class PositionObserver:
         self.X = matrix("0;0;0;0")
         self.R = matrix("1,0;0,1")
 
-    def estimate(self, Vair, theta, psi, GPS_Pn, GPS_Pe, Wn_est, We_est, dt):
-        psi = TD.HEADING
+    def estimate(self, Vair, theta, psi, GPS_Pn, GPS_Pe, dt):
+        # CHECK UNITS
+        psi = wrap(TD.HEADING)
         theta = TD.PITCH
-        Vair = TD.AIRSPEED
+        Vair = TD.TRUEAIRSPEED * 1.68780986 # m/s to ft/s
+        display.register_scalars({"Vair":Vair,"psi":psi,"theta":theta,"dt":dt},"Dead reckoning")
         Qpn = (self.Qot*abs(cos(psi))) + (self.Qxt*abs(sin(psi)))
         Qpe = (self.Qot*abs(sin(psi))) + (self.Qxt*abs(cos(psi)))
         Qwn = .00001
         Qwe = .00001
         self.Q = matrix("%f,0,0,0; 0,%f,0,0; 0,0,%f,0; 0,0,0,%f" % (Qpn, Qpe, Qwn, Qwe))
 
-        X_dot = matrix("%f;%f;%f;%f" % (Vair*cos(psi)*cos(theta) - Wn_est,
-                                        Vair*sin(psi)*cos(theta) - We_est,
+        X_dot = matrix("%f;%f;%f;%f" % (Vair*cos(psi)*cos(theta) - self.Wn_est,
+                                        Vair*sin(psi)*cos(theta) - self.We_est,
                                         0,
                                         0))
         self.X = self.X+X_dot*dt
@@ -346,4 +347,6 @@ class PositionObserver:
         h = matrix("%f;%f" % (self.X[0,0],self.X[1,0]))
 
         self.X = self.X + self.L*(z-h)
+        self.Wn_est, self.We_est = self.X[2,0], self.X[3,0]
+        display.register_scalars({"z-h:0":(z-h)[0,0],"z-h:1":(z-h)[1,0]},"Dead reckoning")
         return self.X
