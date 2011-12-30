@@ -8,6 +8,7 @@ from display import Display
 from utils import safe_tangent, wrap, GRAVITY
 import logging
 import logging.config
+import csv
 
 from truthdata import TruthData
 
@@ -16,6 +17,8 @@ display = Display()
 
 logging.config.fileConfig("logging.conf")
 logger = logging.getLogger("shumai")
+
+FOUT = csv.writer(open('data.csv', 'w'), delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
 
 ''' EKF = Extended Kalman Filter
 '''
@@ -172,9 +175,9 @@ class AttitudeObserver:
                     "Lz":self.Lz,}
         estimates = {"Phi (deg)":degrees(self.phi),
                      "Theta (deg)":degrees(self.theta),}
-        display.register_scalars(scalars, "Sensors")
-        display.register_scalars(estimates, "Estimates")
-        display.register_matrices(matrices, "Internal states")
+        #display.register_scalars(scalars, "Sensors")
+        #display.register_scalars(estimates, "Estimates")
+        #display.register_matrices(matrices, "Internal states")
 
     def estimate_roll_and_pitch(self, p, q, r, Vair, ax, ay, az, dt):
         self.p, self.q, self.r = p, q, r
@@ -274,7 +277,7 @@ class HeadingObserver:
         self.calc_kalman_gain_matrix()
         self.update_state_estimate(bx, by, bz)
         self.update_covariance_matrix()
-        display.register_scalars({"Psi":180-degrees(self.psi)})
+        #display.register_scalars({"Psi":180-degrees(self.psi)})
         return self.psi
 
     def magnetometer_readings_to_tilt_compensated_heading(self, bx, by, bz, phi, theta):
@@ -295,48 +298,56 @@ class HeadingObserver:
         psi_error = self.psi_estimate - psi_measured
         self.psi_estimate += self.k_psi * psi_error
         logger.info("Heading %f" % self.psi_estimate)
-        display.register_scalars({"Psi":degrees(self.psi_estimate)})
+        #display.register_scalars({"Psi":degrees(self.psi_estimate)})
         return self.psi_estimate
 
 class PositionObserver:
     def __init__(self):
-        self.Qxt = 0.00025 # noise due to heading error & airspeed
-        self.Qot = 0.00025 # on track noise due to airspeed
+        self.Qxt = 10.0 # noise due to heading error & airspeed
+        self.Qot = 10.0 # on track noise due to airspeed
         self.Wn_est = 0.0
         self.We_est = 0.0
-        self.A = matrix("0,0,-1,0; 0,0,0,-1; 0,0,0,0; 0,0,0,0")
-        self.I = matrix("1,0,0,0; 0,1,0,0; 0,0,1,0; 0,0,0,1")
-        self.P = matrix("1,0,0,0; 0,1,0,0; 0,0,1,0; 0,0,0,1")
-        self.Q = matrix("1,0,0,0; 0,1,0,0; 0,0,1,0; 0,0,0,1")
-        self.L = matrix("1,0,0,0; 0,1,0,0; 0,0,1,0; 0,0,0,1")
-        self.C = matrix("1,0,0,0;0,1,0,0")
-        self.X = matrix("0;0;0;0")
-        self.R = matrix("1,0;0,1")
+        self.Cpress = 1.0
+        #self.A = matrix("0,0,-1,0,1.0; 0,0,0,-1,1.0; 0,0,0,0,0; 0,0,0,0,0; 0,0,0,0,0")
+        self.I = matrix("1,0,0,0,0; 0,1,0,0,0; 0,0,1,0,0; 0,0,0,1,0; 0,0,0,0,1")
+        self.P = matrix("1,0,0,0,0; 0,1,0,0,0; 0,0,1,0,0; 0,0,0,1,0; 0,0,0,0,1")
+        self.Q = matrix("1,0,0,0,0; 0,1,0,0,0; 0,0,1,0,0; 0,0,0,1,0; 0,0,0,0,1")
+        self.L = matrix("1,0,0,0,0; 0,1,0,0,0; 0,0,1,0,0; 0,0,0,1,0; 0,0,0,0,1")
+        self.C = matrix("1,0,0,0,0; 0,1,0,0,0")
+        self.X = matrix("0;0;0;0;1.0")
+        self.R = matrix("250.0,0;0,250.0")
 
     def estimate(self, Vair, theta, psi, GPS_Pn, GPS_Pe, dt):
         # CHECK UNITS
+        #psi = wrap(psi)
         psi = wrap(TD.HEADING)
         theta = TD.PITCH
-        Vair = TD.TRUEAIRSPEED * 1.68780986 # m/s to ft/s
+        Vair = TD.AIRSPEED * 1.68780986 # m/s to ft/s
         display.register_scalars({"Vair":Vair,"psi":psi,"theta":theta,"dt":dt},"Dead reckoning")
         Qpn = (self.Qot*abs(cos(psi))) + (self.Qxt*abs(sin(psi)))
         Qpe = (self.Qot*abs(sin(psi))) + (self.Qxt*abs(cos(psi)))
-        Qwn = .00001
-        Qwe = .00001
-        self.Q = matrix("%f,0,0,0; 0,%f,0,0; 0,0,%f,0; 0,0,0,%f" % (Qpn, Qpe, Qwn, Qwe))
+        Qwn = 1.0
+        Qwe = 1.0
+        Qcpress = 0.1
+        self.Q = matrix("%f,0,0,0,0; 0,%f,0,0,0; 0,0,%f,0,0; 0,0,0,%f,0; 0,0,0,0,%f" % \
+                                                            (Qpn, Qpe, Qwn, Qwe, Qcpress))
 
-        X_dot = matrix("%f;%f;%f;%f" % (Vair*cos(psi)*cos(theta) - self.Wn_est,
-                                        Vair*sin(psi)*cos(theta) - self.We_est,
-                                        0,
-                                        0))
+        X_dot = matrix("%f;%f;%f;%f;%f" % (self.Cpress*Vair*cos(psi)*cos(theta) - self.Wn_est,
+                                           self.Cpress*Vair*sin(psi)*cos(theta) - self.We_est,
+                                           0,
+                                           0,
+                                           0))
         self.X = self.X+X_dot*dt
 
-        self.A = matrix("0,0,-1,0;0,0,0,-1;0,0,0,0;0,0,0,0")
+        self.A = matrix("0,0,-1,0,%f; 0,0,0,-1,%f; 0,0,0,0,0; 0,0,0,0,0; 0,0,0,0,0" % \
+                                    #(1.0,1.0))
+                                    (Vair*cos(psi)*cos(theta), Vair*cos(theta)*sin(psi)))
+        display.register_scalars({"Vtrue/Vias":(TD.TRUEAIRSPEED*1.68780986)/Vair, "0":Vair*cos(psi)*cos(theta), "1":Vair*cos(theta)*sin(psi)},"Dead reckoning")
 
         P_dot = self.A*self.P + self.P*self.A.transpose() + self.Q
         self.P = self.P + P_dot*dt
 
-        self.C = matrix("1,0,0,0;0,1,0,0")
+        self.C = matrix("1,0,0,0,0; 0,1,0,0,0")
 
         self.L = self.P*self.C.transpose()*linalg.inv(self.R+self.C*self.P*self.C.transpose())
         #To invert the matrix it must not be singular ie have a det()=0
@@ -346,7 +357,27 @@ class PositionObserver:
         z = matrix("%f;%f" % (GPS_Pn,GPS_Pe))
         h = matrix("%f;%f" % (self.X[0,0],self.X[1,0]))
 
+        display.register_scalars({"Vtrue_est":Vair*self.Cpress/1.68780986},"Dead reckoning")
+        display.register_scalars({"z-h:0":(z-h)[0,0],"z-h:1":(z-h)[1,0]},"Dead reckoning")
+        matrices = {"A":self.A,
+                    "Q":self.Q,
+                    "P":self.P,
+                    "P_dot":P_dot,
+                    "C":self.C,
+                    "L":self.L,
+                    "X":self.X,
+                    "X_dot":X_dot,
+                    "z":z,
+                    "h":h,
+                    "z-h":z-h}
+
         self.X = self.X + self.L*(z-h)
         self.Wn_est, self.We_est = self.X[2,0], self.X[3,0]
-        display.register_scalars({"z-h:0":(z-h)[0,0],"z-h:1":(z-h)[1,0]},"Dead reckoning")
+        self.Cpress = self.X[4,0]
+        display.register_matrices(matrices, "Internal states")
+
+        wind_direction_estimate = degrees(atan2(self.X[3,0], self.X[2,0]))
+        wind_velocity_estimate = sqrt(self.X[3,0]**2 + self.X[2,0]**2) * 0.592483801 # convert from ft/s to knots
+        FOUT.writerow([GPS_Pn, GPS_Pe, self.X[0,0], self.X[1,0], TD.WIND_VELOCITY, TD.WIND_DIRECTION, wind_velocity_estimate, wind_direction_estimate, (TD.TRUEAIRSPEED*1.68780986)/Vair, self.X[4,0]])
+
         return self.X

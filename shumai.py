@@ -16,10 +16,14 @@ from fgo import AltitudeObserver, WindObserver
 from gps import EmulatedXplaneGPS
 from utils import get_ip_address, wrap
 from truthdata import TruthData
+import redis
+
 try:
     from autopilot import Autopilot
 except:
     pass
+
+r = redis.Redis()
 
 def safe_get_ip_address():
     try:
@@ -39,7 +43,7 @@ LEVELS = {'debug': logging.DEBUG,
           'error': logging.ERROR,
           'critical': logging.CRITICAL}
 
-FOUT = csv.writer(open('data.csv', 'w'), delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+#FOUT = csv.writer(open('data.csv', 'w'), delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
 
 UDP_PORT=49045 # was 49503
 UDP_SENDTO_PORT=49001
@@ -93,28 +97,28 @@ class Shumai:
         p, q, r = self.imu.read_gyros()
         ax, ay, az = self.imu.read_accelerometers()
         Vair = self.differential_pressure_sensor.read_airspeed() * 0.5144444444 # kias to meters per second
-        display.register_scalars({"Vair":Vair/0.5144444444}, "Sensors")
+        #display.register_scalars({"Vair":Vair/0.5144444444}, "Sensors")
         phi, theta = self.attitude_observer.estimate_roll_and_pitch(p, q, r, Vair, ax, ay, az, TD.DT)
         bx, by, bz = self.magnetometer.read_magnetometer()
         psi = self.heading_observer.estimate_heading(bx, by, bz, phi, theta, q, r, TD.DT)
         gps_data = self.gps.update(TD.DT)
-        display.register_scalars({"gps_lat": gps_data['latitude'],
-                                  "gps_lon": gps_data['longitude'],
-                                  "gps_alt": gps_data['altitude'],
-                                  "gps_sog": gps_data['speed_over_ground'],}, "Sensors")
+        #display.register_scalars({"gps_lat": gps_data['latitude'],
+        #                          "gps_lon": gps_data['longitude'],
+        #                          "gps_alt": gps_data['altitude'],
+        #                          "gps_sog": gps_data['speed_over_ground'],}, "Sensors")
         altitude = self.altitude_observer.estimate(theta, Vair, gps_data['altitude'], TD.DT)
         
-        display.register_scalars({"alt_est": altitude}, "Estimates")
-        display.register_scalars({"Altitude": altitude - TD.ALTITUDE}, "Performance")
+        #display.register_scalars({"alt_est": altitude}, "Estimates")
+        #display.register_scalars({"Altitude": altitude - TD.ALTITUDE}, "Performance")
         wind_direction, wind_velocity = self.wind_observer.estimate(theta, psi, Vair, gps_data['speed_over_ground'] * .5144444444, gps_data['course_over_ground'], TD.DT)
         GPS_Pn, GPS_Pe = self.gps.relative_gps()
         X = self.position_observer.estimate(Vair, theta, psi, GPS_Pn, GPS_Pe, TD.DT)
-        Pn, Pe, Wn, We = X[0,0], X[1,0], X[2,0], X[3,0]
+        Pn, Pe, Wn, We, Cpress = X[0,0], X[1,0], X[2,0], X[3,0], X[4,0]
         wind_direction = degrees(atan2(We,Wn))
         wind_velocity = sqrt(We**2 + Wn**2) # * 0.592483801 # convert from ft/s to knots
-        display.register_scalars({"Pn": Pn,"Pe": Pe,"Wn": Wn,"We": We,"GPS_Pn":GPS_Pn,"GPS_Pe":GPS_Pe}, "Dead reckoning")
+        display.register_scalars({"Pn": Pn,"Pe": Pe,"Wn": Wn,"We": We,"GPS_Pn":GPS_Pn,"GPS_Pe":GPS_Pe,"Cpress":Cpress}, "Dead reckoning")
         display.register_scalars({"wind_direction": wind_direction, "wind_velocity": wind_velocity}, "Dead reckoning")
-        display.register_scalars({"Wdir error": wind_direction - TD.WIND_DIRECTION, "Wvel error": wind_velocity - TD.WIND_VELOCITY}, "Performance")
+        #display.register_scalars({"Wdir error": wind_direction - TD.WIND_DIRECTION, "Wvel error": wind_velocity - TD.WIND_VELOCITY}, "Performance")
         # Shoot, I forget what this is, something from Ryan
         # //SOG[0] = 'data from gps'
         # //u_dot = 'x accel from a2d'
@@ -138,6 +142,8 @@ class XplaneListener(DatagramProtocol):
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((safe_get_ip_address(),49998))
+        # self.matlab_graphing_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # self.matlab_graphing_sock.bind((safe_get_ip_address(),41862))
         self.last_time = datetime.now()
         self.ekf = Shumai(self, self, self, self, self) # hack for X-Plane
         self.bxyz = matrix("0.0 0.0 0.0; 0.0 0.0 0.0; 0.0 0.0 0.0")
@@ -172,23 +178,24 @@ class XplaneListener(DatagramProtocol):
         TD.ALTITUDE = unpack_from(fmt, data, 9+216+8)[0]
         TD.SPEEDOVERGROUND = unpack_from(fmt, data, 9+12)[0]
         #display.register_scalars({"SOG":TD.SPEEDOVERGROUND, "IAS":TD.AIRSPEED}, "Testing")
-        display.register_scalars({"lat":TD.LATITUDE,"lon":TD.LONGITUDE,"alt":TD.ALTITUDE,"sog":TD.SPEEDOVERGROUND,"cog":degrees(TD.COURSEOVERGROUND)}, "Sensors")
+        #display.register_scalars({"lat":TD.LATITUDE,"lon":TD.LONGITUDE,"alt":TD.ALTITUDE,"sog":TD.SPEEDOVERGROUND,"cog":degrees(TD.COURSEOVERGROUND)}, "Sensors")
         self.generate_virtual_magnetometer_readings(TD.ROLL,TD.PITCH,TD.HEADING)
-        display.register_scalars({"bx":TD.BX,"by":TD.BY,"bz":TD.BZ,"true heading":degrees(TD.HEADING)}, "Sensors")
+        #display.register_scalars({"bx":TD.BX,"by":TD.BY,"bz":TD.BZ,"true heading":degrees(TD.HEADING)}, "Sensors")
         logger.debug("Vair %0.1f, accelerometers (%0.2f, %0.2f, %0.2f), gyros (%0.2f, %0.2f, %0.2f)" % (TD.AIRSPEED, TD.AX, TD.AY, TD.AZ, TD.P, TD.Q, TD.R))
         current_state = self.ekf.loop()
-        display.register_scalars({"Psi error":current_state['yaw']-degrees(TD.HEADING)}, "Performance")
+        #display.register_scalars({"Psi error":current_state['yaw']-degrees(TD.HEADING)}, "Performance")
         if display.curses_available is True:
             display.draw()
         else:
             sys.stdout.write("%sRoll = %f, pitch = %f      " % (chr(13), current_state['roll'], current_state['pitch']))
             sys.stdout.flush()
         #FOUT.writerow([degrees(TD.ROLL), degrees(TD.PITCH), current_state['roll'], current_state['pitch'], current_state['roll'] - degrees(TD.ROLL), current_state['pitch'] - degrees(TD.PITCH)])
-        display.register_scalars({"Phi error": current_state['roll'] - degrees(TD.ROLL), "Theta error": current_state['pitch'] - degrees(TD.PITCH), "Psi error": current_state['yaw'] - degrees(TD.HEADING)}, "Performance")
+        #display.register_scalars({"Phi error": current_state['roll'] - degrees(TD.ROLL), "Theta error": current_state['pitch'] - degrees(TD.PITCH), "Psi error": current_state['yaw'] - degrees(TD.HEADING)}, "Performance")
         try:
             self.autopilot.heading_hold()
             self.sendJoystick((self.autopilot.roll_hold(), self.autopilot.pitch_hold()), 0)
             self.sendThrottle(self.autopilot.throttle())
+            self.sendMatlabGraphingData(TD.DT)
         except:
             pass
 
@@ -203,7 +210,7 @@ class XplaneListener(DatagramProtocol):
         self.bxyz[2,0] = (cos(phi) * sin(theta) * cos(psi)) + (sin(phi) * sin(psi))
         self.bxyz[2,1] = (cos(phi) * sin(theta) * sin(psi)) - (sin(phi) * cos(psi))
         self.bxyz[2,2] = cos(phi) * cos(theta)
-        display.register_matrices({"bxyz":self.bxyz})
+        #display.register_matrices({"bxyz":self.bxyz})
         b = self.bxyz * self.mxyz
         TD.BX = b[0,0]
         TD.BY = b[1,0]
@@ -215,8 +222,8 @@ class XplaneListener(DatagramProtocol):
         pitch = degrees(pitch)
         roll = degrees(roll)
         yaw = (degrees(yaw) + 360) % 360
-        display.register_scalars({"DCM-pitch": pitch, "DCM-roll": roll, "DCM-yaw": yaw}, "Estimates")
-        display.register_scalars({"DCM-pitch-e": pitch - degrees(TD.PITCH), "DCM-roll-e": roll - degrees(TD.ROLL), "DCM-yaw-e": yaw - degrees(TD.HEADING)}, "Performance")
+        #display.register_scalars({"DCM-pitch": pitch, "DCM-roll": roll, "DCM-yaw": yaw}, "Estimates")
+        #display.register_scalars({"DCM-pitch-e": pitch - degrees(TD.PITCH), "DCM-roll-e": roll - degrees(TD.ROLL), "DCM-yaw-e": yaw - degrees(TD.HEADING)}, "Performance")
 
     def read_gyros(self):
         return TD.P, TD.Q, TD.R
@@ -229,6 +236,12 @@ class XplaneListener(DatagramProtocol):
 
     def read_magnetometer(self):
         return TD.BX, TD.BY, TD.BZ
+
+    def sendMatlabGraphingData(self, dt):
+        r.rpush("xplane", sin(dt))
+        # x = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9,]
+        # data = pack('ffffffffff', x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9])
+        # self.matlab_graphing_sock.sendto(data,('70.177.242.58',41862))
 
     def sendThrottle(self, throttle):
         data_selection_packet = "DATA0\x19\x00\x00\x00" # throttle
